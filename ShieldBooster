@@ -1,0 +1,12 @@
+from Boosters import Booster
+
+class ShieldBooster(Booster):
+    def __init__(self, x, y, duration):
+        image_path = 'assets/Sprites/Boosters/shield.png'  # Ruta de la imagen del potenciador de escudo
+        super().__init__('shield', duration, image_path)
+        self.position = (x, y)
+
+    def apply_effect(self, player):
+        """Activar escudo en el jugador."""
+        player.shield_active = True  # Activa el escudo
+        player.shield_duration = self.duration  # Establece la duración del escudo
