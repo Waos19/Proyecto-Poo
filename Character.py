@@ -15,7 +15,6 @@ class Character:
         self.rect = self.image.get_rect(center=(x, y))
         self.radius = self.rect.width // 2  # Radio para colisiones
         self.collision_rect = pygame.Rect(x - self.radius, y - self.radius, self.radius * 2, self.radius * 2)
-        
         self.max_health = 100
         self.current_health = self.max_health
         self.health_bar_length = 100
@@ -84,10 +83,10 @@ class Character:
         self.draw_health(screen)
     
     def DrawAmmo(self, screen):
-         ammo_text = self.font.render(f'Munición: {self.current_ammo}/{self.max_ammo}', True, (255, 255, 255))
-         screen.blit(ammo_text, (10, 10))  
+        ammo_text = self.font.render(f'Munición: {self.current_ammo}/{self.max_ammo}', True, (255, 255, 255))
+        screen.blit(ammo_text, (10, 10))  
 
-         if self.reloading:
+        if self.reloading:
             current_time = pygame.time.get_ticks()
             reload_progress = (current_time - self.last_reload_time) / self.reload_time
             reload_bar_length = 200  
