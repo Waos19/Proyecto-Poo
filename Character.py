@@ -14,6 +14,7 @@ class Character:
         self.rect = self.image.get_rect(center=(x, y))
         self.radius = self.rect.width // 2  # Radio para colisiones
         self.collision_rect = pygame.Rect(x - self.radius, y - self.radius, self.radius * 2, self.radius * 2)
+        self.weapon = Pistol(self)
         
         self.max_health = 100
         self.current_health = self.max_health
@@ -38,20 +39,9 @@ class Character:
     def draw(self, screen, camera):
         screen.blit(self.image, camera.apply(self))
         self.draw_health(screen)
-    
-    def DrawAmmo(self, screen):
-        ammo_text = self.font.render(f'Munición: {self.current_ammo}/{self.max_ammo}', True, (255, 255, 255))
-        screen.blit(ammo_text, (10, 10))  
+        #self.weapon.draw_ammo(screen)  # Dibuja la munición del arma
 
-        if self.reloading:
-            current_time = pygame.time.get_ticks()
-            reload_progress = (current_time - self.last_reload_time) / self.reload_time
-            reload_bar_length = 200  
-            bar_color = (0, 255, 0)  
-
-            pygame.draw.rect(screen, bar_color, (10, 50, reload_bar_length * reload_progress, 20))
-    
-    def Movement(self, dx, dy):
+    def movement(self, dx, dy):
         if dx != 0 and dy != 0:
             dx *= 0.7071  # Normalización de movimiento diagonal
         
