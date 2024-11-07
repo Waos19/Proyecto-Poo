@@ -3,42 +3,85 @@ import sys
 import Settings
 from World import World
 from Camera import Camera
-from Character import Character
+from Tank import Tank  
+from Scout import Scout  
+from Fighter import Fighter
 from WeaponsPickupManager import WeaponPickupsManager
 
-# Iniciando pygame
+# Initialize pygame
 pygame.init()
 
-# Ventana principal
-Screen = pygame.display.set_mode((Settings.Width, Settings.Heigth))
-pygame.display.set_caption("Primeros pasos")
+# Set up the main window
+Screen = pygame.display.set_mode((Settings.Width, Settings.Height))
+pygame.display.set_caption("Selección de nave")
 
-# Variables
+# Global variables
 Clock = pygame.time.Clock()
+Font = pygame.font.Font(None, 36)  # Font for text
 
-# Función main
+# Function for the ship selection menu
+def ShipSelectionMenu():
+    while True:
+        Screen.fill((0, 0, 0))  # Black background
+
+        # Menu text
+        title_text = Font.render("Selecciona tu nave:", True, (255, 255, 255))
+        tank_text = Font.render("1 - Tank (Alta vida, baja velocidad)", True, (255, 0, 0))
+        scout_text = Font.render("2 - Scout (Baja vida, alta velocidad)", True, (0, 255, 0))
+        fighter_text = Font.render("3 - Fighter (Equilibrado)", True, (0, 0, 255))
+
+        # Draw the text on the screen
+        Screen.blit(title_text, (Settings.Width // 2 - title_text.get_width() // 2, 100))
+        Screen.blit(tank_text, (Settings.Width // 2 - tank_text.get_width() // 2, 200))
+        Screen.blit(scout_text, (Settings.Width // 2 - scout_text.get_width() // 2, 300))
+        Screen.blit(fighter_text, (Settings.Width // 2 - fighter_text.get_width() // 2, 400))
+
+        pygame.display.flip()
+
+        # Events for selecting the ship
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_1:
+                    return Tank(Settings.Width // 2, Settings.Height // 2)
+                elif event.key == pygame.K_2:
+                    return Scout(Settings.Width // 2, Settings.Height // 2)
+                elif event.key == pygame.K_3:
+                    return Fighter(Settings.Width // 2, Settings.Height // 2)
+
+weapon_types = ["LaserGun", "MachineGun", "RocketLauncher"]
+weapon_pickups_manager = WeaponPickupsManager(weapon_types, spawn_interval=5000, max_pickups=5)
+
+
+# Main game function
 def Main():
-    # Instanciando objetos
-    world = World(1920,1200)
-    Player = Character(Settings.Width // 2, Settings.Heigth // 2)
+    # Create the world and camera
+    world = World(1920, 1200)
     camera = Camera(world.width, world.height)
     
-    # Ciclo principal
+    # Run the ship selection menu
+    Player = ShipSelectionMenu()
+    
+    # Main game loop
     while True:
-        # Ciclo que busca eventos y contiene un condicional si el juego es cerrado
+        
+        delta_time = Clock.tick(Settings.Fps)
+        
+        # Game events
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
         
-        # Variables de movimiento
-        dx = 0
-        dy = 0
+        # Movement variables
+        dx, dy = 0, 0
         
         # Movement inputs
         keys = pygame.key.get_pressed()
         if keys[pygame.K_a]:
-            dx -= 5
+            dx -= Player.speed  # Use the player's speed
         if keys[pygame.K_d]:
             dx += Player.speed
         if keys[pygame.K_w]:
@@ -58,24 +101,16 @@ def Main():
         # Move the player
         Player.movement(dx, dy)
 
-        # Hacer que el personaje mire al mouse
-        Player.LookAtMouse(camera)
+        # Rotate the character towards the mouse
+        Player.lookAtMouse(camera)
         
-        # Metodos update
-        Player.Update()
+        # Update methods
+        Player.update()
         camera.update(Player)
+        weapon_pickups_manager.update(delta_time)
+        weapon_pickups_manager.handle_collision(Player)
         
-        # Actualizar y comprobar colisiones de las balas
-        for bullet in list(Player.bullets):
-            bullet.update()
-            if bullet.is_off_screen():
-                Player.bullets.remove(bullet)
-            else:
-                for other_player in [Player]:  # Aquí puedes añadir más jugadores si los tienes
-                    if other_player != bullet.shooter:
-                        bullet.check_collision(other_player)
-        
-        # Metodos Draw
+        # Draw methods
         Screen.blit(world.background, camera.apply(world))
         Player.draw(Screen, camera)
         Player.draw_health(Screen)
