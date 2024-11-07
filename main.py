@@ -3,6 +3,8 @@ import sys
 import Settings
 from World import World
 from Camera import Camera
+from Character import Character
+from WeaponsPickupManager import WeaponPickupsManager
 
 # Iniciando pygame
 pygame.init()
