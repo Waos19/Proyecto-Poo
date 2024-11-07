@@ -1,5 +1,4 @@
 # Pistol.py
-import pygame
 from Weapons import Weapon
 
 class Pistol(Weapon):
@@ -9,3 +8,4 @@ class Pistol(Weapon):
         self.current_ammo = self.max_ammo
         self.shoot_cooldown = 500  # Tiempo de recarga más largo para la pistola
         self.reload_time = 1500  # Tiempo de recarga
+        self.damage = 3

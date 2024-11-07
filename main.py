@@ -5,7 +5,8 @@ from World import World
 from Camera import Camera
 from Tank import Tank  
 from Scout import Scout  
-from Fighter import Fighter  
+from Fighter import Fighter
+from WeaponsPickupManager import WeaponPickupsManager
 
 # Initialize pygame
 pygame.init()
@@ -50,6 +51,10 @@ def ShipSelectionMenu():
                 elif event.key == pygame.K_3:
                     return Fighter(Settings.Width // 2, Settings.Height // 2)
 
+weapon_types = ["LaserGun", "MachineGun", "RocketLauncher"]
+weapon_pickups_manager = WeaponPickupsManager(weapon_types, spawn_interval=5000, max_pickups=5)
+
+
 # Main game function
 def Main():
     # Create the world and camera
@@ -61,6 +66,9 @@ def Main():
     
     # Main game loop
     while True:
+        
+        delta_time = Clock.tick(Settings.Fps)
+        
         # Game events
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -99,12 +107,17 @@ def Main():
         # Update methods
         Player.update()
         camera.update(Player)
+        weapon_pickups_manager.update(delta_time)
+        weapon_pickups_manager.handle_collision(Player)
         
         # Draw methods
         Screen.blit(world.background, camera.apply(world))
         Player.draw(Screen, camera)
         Player.draw_health(Screen)
         Player.weapon.draw_bullets(Screen, camera)
+        Player.weapon.DrawAmmo(Screen)
+        weapon_pickups_manager.draw(Screen, camera)
+        
 
         # Update the screen
         pygame.display.flip()

@@ -39,7 +39,7 @@ class Character:
     def draw(self, screen, camera):
         screen.blit(self.image, camera.apply(self))
         self.draw_health(screen)
-        self.weapon.draw_ammo(screen)  # Dibuja la munición del arma
+        #self.weapon.draw_ammo(screen)  # Dibuja la munición del arma
 
     def movement(self, dx, dy):
         if dx != 0 and dy != 0:

@@ -2,52 +2,61 @@
 import pygame
 import math
 import random
-from Bullet import Bullet  # Asegúrate de que el nombre del archivo es correcto
+from Bullet import Bullet
 import Settings
 
 class Weapon:
     def __init__(self, shooter):
         self.shooter = shooter
-        self.max_ammo = 30
-        self.current_ammo = self.max_ammo
-        self.reload_time = 2000  # Tiempo de recarga en milisegundos
+        self.damage = 10  # Daño base (esto se puede sobrescribir en subclases)
+        self.max_ammo = None  # Armas ilimitadas tendrán None como munición máxima
+        self.current_ammo = None
+        self.reload_time = 2000
         self.last_reload_time = 0
         self.reloading = False
-        self.shoot_cooldown = 100  # Retraso entre disparos
+        self.shoot_cooldown = 100
         self.last_shot_time = 0
         self.bullets = pygame.sprite.Group()
         self.font = pygame.font.Font(None, 36)
-        self.magazines = 3  # Cantidad de cargadores
 
-    def shoot(self):
+    def shoot(self, angle):
         current_time = pygame.time.get_ticks()
         
-        if not self.reloading and self.current_ammo > 0 and (current_time - self.last_shot_time) > self.shoot_cooldown:
-            # Lógica para disparar
-            self.current_ammo -= 1
+        if not self.reloading and self.current_ammo != 0 and (current_time - self.last_shot_time) > self.shoot_cooldown:
+            bullet = Bullet(self.shooter.rect.center, angle, self.shooter, self.damage)
+            self.bullets.add(bullet)
             self.last_shot_time = current_time
-
-            if self.current_ammo <= 0:
-                self.magazines -= 1
-                if self.magazines > 0:
-                    self.reload()  # Recargar si hay cargadores restantes
-                else:
-                    self.current_ammo = 0  # Se queda sin munición
-                    print("No more ammo in this weapon!")
-                    return False  # Indicar que no se puede disparar
-
-        return True  # Indicar que se disparó correctamente
+            if self.current_ammo is not None:
+                self.current_ammo -= 1
+            return True
+        return False
 
     def reload(self):
-        if not self.reloading and self.magazines > 0:
+        if not self.reloading and self.current_ammo < self.max_ammo:
             self.reloading = True
             self.last_reload_time = pygame.time.get_ticks()
-            self.current_ammo = self.max_ammo
+
+    def draw_bullets(self, screen, camera):
+        # Dibuja todas las balas en pantalla
+        for bullet in self.bullets:
+            bullet.draw(screen, camera)  # Utiliza el método `draw` de `Bullet`
+            
+    def DrawAmmo(self, screen):
+        ammo_text = self.font.render(f'Munición: {self.current_ammo}', True, (255, 255, 255))
+        screen.blit(ammo_text, (10, 10))  
+
+        if self.reloading:
+            current_time = pygame.time.get_ticks()
+            reload_progress = (current_time - self.last_reload_time) / self.reload_time
+            reload_bar_length = 200  
+            bar_color = (0, 255, 0)  
+
+            pygame.draw.rect(screen, bar_color, (10, 50, reload_bar_length * reload_progress, 20))
 
     def update(self):
-        # Lógica de actualización si es necesario
         if self.reloading:
             current_time = pygame.time.get_ticks()
             if current_time - self.last_reload_time >= self.reload_time:
+                self.current_ammo = self.max_ammo
                 self.reloading = False
-
+        self.bullets.update()

@@ -8,7 +8,8 @@ class RocketLauncher(Weapon):
         super().__init__(shooter)
         self.max_ammo = 5  # Menos munición
         self.current_ammo = self.max_ammo
-        self.shoot_cooldown = 1000  # Disparo más lento
+        self.shoot_cooldown = 1000  # Disparo más 
+        self.damage = 20
 
     def shoot(self, angle):
         current_time = pygame.time.get_ticks()
@@ -17,7 +18,7 @@ class RocketLauncher(Weapon):
             bullet_x = self.shooter.x + radius * math.cos(math.radians(angle))
             bullet_y = self.shooter.y - radius * math.sin(math.radians(angle))
 
-            bullet = Bullet((bullet_x, bullet_y), angle, self.shooter)  # Sin dispersión
+            bullet = Bullet((bullet_x, bullet_y), angle, self.shooter, self.damage)  # Sin dispersión
             self.bullets.add(bullet)
             self.current_ammo -= 1
             self.last_shot_time = current_time
