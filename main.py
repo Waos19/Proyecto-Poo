@@ -99,7 +99,7 @@ def Main():
             Player.weapon.shoot(angle)
         
         # Move the player
-        Player.movement(dx, dy)
+        Player.Movement(dx, dy)
 
         # Rotate the character towards the mouse
         Player.lookAtMouse(camera)
