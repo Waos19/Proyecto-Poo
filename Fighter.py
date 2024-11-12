@@ -7,7 +7,7 @@ class Fighter(Character):
         super().__init__(x, y)
         
         # Cambiamos la imagen específica de Fighter
-        image_path = os.path.join('assets', 'Sprites', 'Player', 'Nairan - Fighter - Base.png')
+        image_path = os.path.join('assets', 'Sprites', 'Player', 'Nautolan Ship - Scout - Base.png')
         self.original_image = pygame.image.load(image_path).convert_alpha()  # Carga la imagen de Fighter
         self.image = pygame.transform.scale(self.original_image, (self.rect.width, self.rect.height))  # Escala la imagen
         self.rect = self.image.get_rect(center=(x, y))  # Ajusta el rectángulo de colisión
