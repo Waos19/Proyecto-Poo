@@ -3,9 +3,6 @@ import sys
 import Settings
 from World import World
 from Camera import Camera
-from Tank import Tank  
-from Scout import Scout  
-from Fighter import Fighter
 from WeaponsPickupManager import WeaponPickupsManager
 from Menus import *
 # Initialize pygame
@@ -29,7 +26,6 @@ def Main():
     # Create the world and camera
     world = World(1920, 1200)
     camera = Camera(world.width, world.height)
-    
     # Run the ship selection menu
     Player = Menu()
     
@@ -91,5 +87,5 @@ def Main():
         # Update the screen
         pygame.display.flip()
         Clock.tick(Settings.Fps)
-
-#Menu()
+        
+Main()
