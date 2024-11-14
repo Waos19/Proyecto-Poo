@@ -139,12 +139,14 @@ def Menu():
                 if button_start.is_clicked(mouse_pos):
                     clic_boton.play()
                     select_ship_1, select_ship_2, select_ship_3 = seleccionar_nave(screen, button_back, ship_1, ship_2, ship_3, button_play, clic_boton)
+                    
+                    # Devuelve el tipo de nave seleccionado en forma de texto
                     if select_ship_1:
-                        return Scout(Settings.Width // 2, Settings.Height//2)
+                        return "Scout"
                     if select_ship_2:
-                        return Tank(Settings.Width // 2, Settings.Height//2)
+                        return "Tank"
                     if select_ship_3:
-                        return Fighter(Settings.Width // 2, Settings.Height//2)
+                        return "Fighter"
 
                 if button_opcion.is_clicked(mouse_pos):
                     clic_boton.play()
@@ -198,5 +200,6 @@ def Menu():
 
         # Actualizar la pantalla
         pygame.display.flip()
+
 
 

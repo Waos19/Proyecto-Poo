@@ -1,4 +1,3 @@
-# weapon.py
 import pygame
 import math
 import random
@@ -18,12 +17,14 @@ class Weapon:
         self.last_shot_time = 0
         self.bullets = pygame.sprite.Group()
         self.font = pygame.font.Font(None, 36)
+        self.bullet_speed = 100
 
     def shoot(self, angle):
         current_time = pygame.time.get_ticks()
-        
         if not self.reloading and self.current_ammo != 0 and (current_time - self.last_shot_time) > self.shoot_cooldown:
-            bullet = Bullet(self.shooter.rect.center, angle, self.shooter, self.damage)
+            # Usa `get_gun_position()` para obtener la posición inicial de la bala
+            start_x, start_y = self.shooter.get_gun_position()
+            bullet = Bullet((start_x, start_y), angle, self.shooter, self.damage, self.bullet_speed)
             self.bullets.add(bullet)
             self.last_shot_time = current_time
             if self.current_ammo is not None:
@@ -40,7 +41,7 @@ class Weapon:
         # Dibuja todas las balas en pantalla
         for bullet in self.bullets:
             bullet.draw(screen, camera)  # Utiliza el método `draw` de `Bullet`
-            
+
     def DrawAmmo(self, screen):
         ammo_text = self.font.render(f'Munición: {self.current_ammo}', True, (255, 255, 255))
         screen.blit(ammo_text, (10, 10))  
@@ -59,4 +60,9 @@ class Weapon:
             if current_time - self.last_reload_time >= self.reload_time:
                 self.current_ammo = self.max_ammo
                 self.reloading = False
-        self.bullets.update()
+        for bullet in self.bullets:
+            bullet.update()
+
+            # Elimina las balas fuera de la pantalla o que hayan expirado
+            if bullet.is_off_screen() or pygame.time.get_ticks() - bullet.creation_time > bullet.life_time:
+                bullet.kill()

@@ -12,7 +12,7 @@ Resolution = [(800,600), (1024, 768), (1152, 864), (1280, 600), (1280, 720), (12
 
 
 #Tamaño del personaje
-tamaño_personaje = 100
+Player_scale: 100
 
 #Fotogramas por segundo
 Fps = 60;

@@ -16,6 +16,7 @@ class Character(pygame.sprite.Sprite):
         self.image = None
         self.rect = None
         self.original_image = None
+        self.scaled_image = None # Imagen escalada
 
         # Cargar la hoja de sprites (sprite sheet)
         self.sheet = pygame.image.load(os.path.join('assets', 'Sprites', 'Player', 'Nautolan Ship - Scout - Sprite.png')).convert_alpha()
@@ -45,9 +46,14 @@ class Character(pygame.sprite.Sprite):
         """ Método para cambiar el sprite del personaje """
         self.sheet = pygame.image.load(image_path).convert_alpha()  # Cargar el nuevo sprite
         self.sheet.set_clip(pygame.Rect(0, 0, 64, 64))  # Tamaño de cada frame
-        self.image = self.sheet.subsurface(self.sheet.get_clip())
+
+        # Escalar la imagen según el valor global de escala
+        self.original_image = self.sheet.subsurface(self.sheet.get_clip())
+        self.scaled_image = pygame.transform.scale(self.original_image, (Settings.Player_scale, Settings.Player_scale))
+
+        # Establecer la imagen escalada
+        self.image = self.scaled_image
         self.rect = self.image.get_rect(center=(self.x, self.y))  # Actualizar el rectángulo
-        self.original_image = self.image.copy()  # Mantener una copia original sin rotación
 
     def update_frame(self):
         # Actualizar el frame de animación
@@ -57,8 +63,11 @@ class Character(pygame.sprite.Sprite):
         # Obtener la imagen base sin rotar
         self.original_image = self.sheet.subsurface(self.sheet.get_clip())
 
-        # Aplicar la rotación guardada
-        self.image = pygame.transform.rotate(self.original_image, self.angle - 90)
+        # Aplicar la escala solo una vez
+        self.scaled_image = pygame.transform.scale(self.original_image, (Settings.PLAYER_SPRITE_SCALE, Settings.PLAYER_SPRITE_SCALE))
+
+        # Aplicar la rotación sobre la imagen escalada
+        self.image = pygame.transform.rotate(self.scaled_image, self.angle - 90)
         self.rect = self.image.get_rect(center=(self.x, self.y))
 
     def update(self):
@@ -104,7 +113,7 @@ class Character(pygame.sprite.Sprite):
         self.angle = math.degrees(math.atan2(-dy, dx))
 
         # Actualizar el ángulo de rotación
-        self.image = pygame.transform.rotate(self.original_image, self.angle - 90)
+        self.image = pygame.transform.rotate(self.scaled_image, self.angle - 90)
 
         # Mantener la posición del centro al rotar
         old_center = self.rect.center
@@ -112,3 +121,9 @@ class Character(pygame.sprite.Sprite):
         self.rect.center = old_center
 
         return self.angle
+    
+    def get_gun_position(self):
+        offset_distance = 32
+        gun_x = self.rect.centerx + math.cos(math.radians(self.angle)) * offset_distance
+        gun_y = self.rect.centery - math.sin(math.radians(self.angle)) * offset_distance
+        return gun_x, gun_y

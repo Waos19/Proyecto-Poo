@@ -24,7 +24,7 @@ class LaserGun(Weapon):
         
         # Disparar solo si no está sobrecalentada
         if not self.reloading and not self.is_overheated and (current_time - self.last_shot_time) > self.shoot_cooldown:
-            bullet = Bullet(self.shooter.rect.center, angle, self.shooter, self.damage)
+            bullet = Bullet(self.shooter.rect.center, angle, self.shooter, self.damage, self.bullet_speed)
             self.bullets.add(bullet)
             self.last_shot_time = current_time
             
