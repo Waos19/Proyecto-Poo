@@ -16,7 +16,7 @@ class Weapon:
         self.shoot_cooldown = 100
         self.last_shot_time = 0
         self.bullets = pygame.sprite.Group()
-        self.font = pygame.font.Font(None, 36)
+        self.font = pygame.font.Font("assets/Font/calamity.ttf", 36)
         self.bullet_speed = 100
 
     def shoot(self, angle):

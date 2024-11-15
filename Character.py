@@ -64,7 +64,7 @@ class Character(pygame.sprite.Sprite):
         self.original_image = self.sheet.subsurface(self.sheet.get_clip())
 
         # Aplicar la escala solo una vez
-        self.scaled_image = pygame.transform.scale(self.original_image, (Settings.PLAYER_SPRITE_SCALE, Settings.PLAYER_SPRITE_SCALE))
+        self.scaled_image = pygame.transform.scale(self.original_image, (Settings.Player_scale, Settings.Player_scale))
 
         # Aplicar la rotación sobre la imagen escalada
         self.image = pygame.transform.rotate(self.scaled_image, self.angle - 90)
