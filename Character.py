@@ -5,10 +5,11 @@ import math
 from DefaultWeapon import Pistol
 
 class Character(pygame.sprite.Sprite):
-    def __init__(self, x, y):
+    def __init__(self, x, y, player_id = None):
         super().__init__()
         self.x = x
         self.y = y
+        self.id = player_id
 
         # Inicializar variables de animación
         self.frame = 0

@@ -7,25 +7,25 @@ import Settings
 class Weapon:
     def __init__(self, shooter):
         self.shooter = shooter
-        self.damage = 10  # Daño base (esto se puede sobrescribir en subclases)
-        self.max_ammo = None  # Armas ilimitadas tendrán None como munición máxima
+        self.damage = 10
+        self.max_ammo = None
         self.current_ammo = None
         self.reload_time = 2000
         self.last_reload_time = 0
         self.reloading = False
         self.shoot_cooldown = 100
         self.last_shot_time = 0
-        self.bullets = pygame.sprite.Group()
+        self.bullets = []
         self.font = pygame.font.Font("assets/Font/calamity.ttf", 36)
         self.bullet_speed = 100
 
     def shoot(self, angle):
         current_time = pygame.time.get_ticks()
         if not self.reloading and self.current_ammo != 0 and (current_time - self.last_shot_time) > self.shoot_cooldown:
-            # Usa `get_gun_position()` para obtener la posición inicial de la bala
             start_x, start_y = self.shooter.get_gun_position()
-            bullet = Bullet((start_x, start_y), angle, self.shooter, self.damage, self.bullet_speed)
-            self.bullets.add(bullet)
+            # Pass shooter_id instead of shooter object
+            bullet = Bullet((start_x, start_y), angle, self.shooter.id, self.damage, self.bullet_speed)
+            self.bullets.append(bullet)
             self.last_shot_time = current_time
             if self.current_ammo is not None:
                 self.current_ammo -= 1

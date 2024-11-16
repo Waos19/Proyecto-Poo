@@ -29,7 +29,7 @@ weapon_pickups_manager = WeaponPickupsManager(weapon_types, spawn_interval=5000,
 
 # Conexión al servidor
 class Client:
-    def __init__(self, host='localhost', port=5555):
+    def __init__(self, host='26.128.187.2', port=5555):
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client.connect((host, port))
         
@@ -50,6 +50,8 @@ class Client:
             "ship_type": "Fighter"  # Valor por defecto
         }
         self.players = []  # Lista para almacenar la información de los jugadores remotos
+        self.bullets = []  # Lista para almacenar las balas remotas
+        self.pickups = []  # Lista para almacenar los pickups remotos
 
     def send_data(self):
         try:
@@ -64,7 +66,10 @@ class Client:
             try:
                 data = self.client.recv(4096)
                 if data:
-                    self.players = pickle.loads(data)
+                    game_data = pickle.loads(data)
+                    self.players = game_data["players"]
+                    self.bullets = game_data["bullets"]  # Recibe las balas
+                    self.pickups = game_data["pickups"]
                 else:
                     print("El servidor ha cerrado la conexión.")
                     break
@@ -121,9 +126,23 @@ def Main():
 
         # Acción con el ratón
         Mouse = pygame.mouse.get_pressed()
+        shot_fired = False
         if Mouse[0]:  # Si el botón izquierdo del ratón está presionado
             angle = Player.lookAtMouse(camera)  # Calcula el ángulo para rotar hacia el mouse
-            Player.weapon.shoot(angle)  # Dispara según la dirección calculada
+            if Player.weapon.shoot(angle):  # Si el disparo fue exitoso
+                shot_fired = True
+
+        client.player_info = {
+            "id": client.id,
+            "x": Player.x,
+            "y": Player.y,
+            "angle": Player.angle,
+            "health": Player.current_health,
+            "ammo": Player.weapon.current_ammo,
+            "ship_type": ship_type,
+            "shot_fired": shot_fired  # Añadir esta información
+        }
+        client.send_data()
 
         # Mover al jugador
         Player.movement(dx, dy)
@@ -137,17 +156,6 @@ def Main():
         weapon_pickups_manager.update(delta_time)
         weapon_pickups_manager.handle_collision(Player)
 
-        # Actualizar información del jugador local
-        client.player_info = {
-            "id": client.id,
-            "x": Player.x,
-            "y": Player.y,
-            "angle": Player.angle,  # Enviar el ángulo calculado
-            "health": Player.current_health,
-            "ammo": Player.weapon.current_ammo,
-            "ship_type": ship_type  # Enviar el tipo de nave seleccionado
-        }
-        client.send_data()  # Enviar la información actualizada al servidor
 
         # Dibujar en pantalla
         Screen.blit(world.background, camera.apply(world))
@@ -159,25 +167,73 @@ def Main():
 
         # Dibujar a los demás jugadores remotos
         for player_info in client.players:
-            if player_info["id"] != client.id:  # Ignorar al jugador local basado en el ID único
-                # Crear un objeto Character temporal para el jugador remoto
+            if player_info["id"] != client.id:
+                # Crear el objeto para el jugador remoto según su tipo de nave
                 if player_info["ship_type"] == "Fighter":
                     remote_player = Fighter(player_info["x"], player_info["y"])
                 elif player_info["ship_type"] == "Tank":
                     remote_player = Tank(player_info["x"], player_info["y"])
                 elif player_info["ship_type"] == "Scout":
                     remote_player = Scout(player_info["x"], player_info["y"])
+                
 
-                # Actualizar el ángulo del jugador remoto
-                remote_player.angle = player_info["angle"]  # Usar el ángulo recibido del servidor
-
-                # Rotar la imagen del jugador remoto según el ángulo
+                # Actualiza el ángulo del jugador remoto
+                remote_player.angle = player_info["angle"]
+                
+                # Rotar el jugador remoto según el ángulo
                 visual_angle = remote_player.angle - 90
+                remote_player.update_frame()  # Actualiza el frame según el valor remoto
                 remote_player.image = pygame.transform.rotate(remote_player.scaled_image, visual_angle)
                 remote_player.rect = remote_player.image.get_rect(center=(remote_player.x, remote_player.y))
-
+                
                 # Dibujar el jugador remoto
                 remote_player.draw(Screen, camera)
+
+        # Dibujar balas remotas
+        for bullet in client.bullets:
+            bullet_x = bullet["x"]
+            bullet_y = bullet["y"]
+            
+            # Crear una superficie para la bala
+            bullet_surface = pygame.Surface((10, 20), pygame.SRCALPHA)
+            bullet_surface.fill((255, 0, 0))  # Color rojo para las balas remotas
+            
+            # Rotar la bala según su ángulo
+            rotated_bullet = pygame.transform.rotate(bullet_surface, -bullet["angle"])
+            bullet_rect = rotated_bullet.get_rect(center=(bullet_x, bullet_y))
+            
+            # Aplicar la cámara a la posición de la bala
+            screen_pos = camera.apply_pos((bullet_x, bullet_y))
+            bullet_rect.center = screen_pos
+            
+            # Dibujar la bala
+            Screen.blit(rotated_bullet, bullet_rect)
+
+
+
+        # Dibujar los pickups de armas remotos
+        for pickup_info in client.pickups:
+            pickup_x = pickup_info["x"]
+            pickup_y = pickup_info["y"]
+            pickup_type = pickup_info["type"]  # El tipo de pickup (LaserGun, MachineGun, etc.)
+
+            # Definir una imagen para el pickup según su tipo (esto es solo un ejemplo)
+            if pickup_type == "LaserGun":
+                pickup_image = pygame.image.load("assets/laser_pickup.png")  # Imagen de ejemplo
+            elif pickup_type == "MachineGun":
+                pickup_image = pygame.image.load("assets/machinegun_pickup.png")  # Imagen de ejemplo
+            elif pickup_type == "RocketLauncher":
+                pickup_image = pygame.image.load("assets/rocketlauncher_pickup.png")  # Imagen de ejemplo
+            else:
+                # Si el tipo no está definido, usamos una imagen por defecto
+                pickup_image = pygame.Surface((30, 30))  # Tamaño genérico
+                pygame.draw.rect(pickup_image, (0, 255, 0), pickup_image.get_rect())  # Color verde como ejemplo
+
+            # Posicionar la imagen del pickup en la pantalla
+            pickup_rect = pickup_image.get_rect(center=(pickup_x, pickup_y))
+            
+            # Dibujar el pickup remoto
+            Screen.blit(pickup_image, pickup_rect)
 
         pygame.display.flip()
         Clock.tick(Settings.Fps)
