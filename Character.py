@@ -3,6 +3,7 @@ import Settings
 import os
 import math
 from DefaultWeapon import Pistol
+import random
 
 class Character(pygame.sprite.Sprite):
     def __init__(self, x, y, player_id = None):
@@ -18,6 +19,9 @@ class Character(pygame.sprite.Sprite):
         self.rect = None
         self.original_image = None
         self.scaled_image = None # Imagen escalada
+        self.is_alive = True
+        self.respawn_delay = 2000  # 2 segundos en milisegundos
+        self.death_time = 0
 
         # Cargar la hoja de sprites (sprite sheet)
         self.sheet = pygame.image.load(os.path.join('assets', 'Sprites', 'Player', 'Nautolan Ship - Scout - Sprite.png')).convert_alpha()
@@ -128,3 +132,21 @@ class Character(pygame.sprite.Sprite):
         gun_x = self.rect.centerx + math.cos(math.radians(self.angle)) * offset_distance
         gun_y = self.rect.centery - math.sin(math.radians(self.angle)) * offset_distance
         return gun_x, gun_y
+
+    def take_damage(self, damage):
+        self.current_health = max(0, self.current_health - damage)
+        if self.current_health <= 0 and self.is_alive:
+            self.die()
+    
+    def die(self):
+        self.is_alive = False
+        self.death_time = pygame.time.get_ticks()
+        self.respawn()
+        
+    def respawn(self):
+        # Generar posición aleatoria dentro del mundo
+        self.x = random.randint(100, Settings.world_width - 100)
+        self.y = random.randint(100, Settings.world_height - 100)
+        self.current_health = self.max_health
+        self.is_alive = True
+        self.rect.center = (self.x, self.y)

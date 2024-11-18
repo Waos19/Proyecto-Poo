@@ -37,10 +37,10 @@ class Weapon:
             self.reloading = True
             self.last_reload_time = pygame.time.get_ticks()
 
-    def draw_bullets(self, screen, camera):
+    """"def draw_bullets(self, screen, camera):
         # Dibuja todas las balas en pantalla
         for bullet in self.bullets:
-            bullet.draw(screen, camera)  # Utiliza el método `draw` de `Bullet`
+            bullet.draw(screen, camera)  # Utiliza el método `draw` de `Bullet`"""
 
     def DrawAmmo(self, screen):
         ammo_text = self.font.render(f'Munición: {self.current_ammo}', True, (255, 255, 255))
