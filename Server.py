@@ -17,7 +17,7 @@ class Server:
         self.running = True
         self.id_counter = 0
         self.weapon_types = ["LaserGun", "MachineGun", "RocketLauncher"]
-        self.spawn_interval = 5000  # Tiempo entre la generación de pickups
+        self.spawn_interval = 3000  # Tiempo entre la generación de pickups
         self.last_spawn_time = time.time()  # Última vez que se generó un pickup
 
     def start(self):
@@ -35,7 +35,7 @@ class Server:
     def update_pickups(self):
         # Generar pickups a intervalos regulares
         if time.time() - self.last_spawn_time > self.spawn_interval / 1000:  # Convertir a segundos
-            if len(self.pickups) < 5:  # Limitar la cantidad de pickups en el mapa
+            if len(self.pickups) < 1000:  # Limitar la cantidad de pickups en el mapa
                 pos = (random.randint(0, Settings.world_width), random.randint(0, Settings.world_height))
                 weapon_type = random.choice(self.weapon_types)
                 pickup = {
@@ -66,7 +66,17 @@ class Server:
                     break
 
                 received_data = pickle.loads(data)
-                
+
+                # Manejar recogida de pickups
+                if "pickup_collected" in received_data:
+                    weapon_type = received_data["pickup_collected"]
+                    pickup_position = received_data["pickup_position"]
+                    for pickup in self.pickups:
+                        if pickup["active"] and (pickup["x"], pickup["y"]) == pickup_position:
+                            pickup["active"] = False  # Desactivar el pickup
+                            print(f"Pickup {weapon_type} recogido por el jugador {player_id}")
+                            break
+
                 # Update player position and other data
                 for i, player in enumerate(self.player_data):
                     if player["id"] == player_id:
@@ -162,13 +172,13 @@ class Server:
                         dy = player["y"] - pickup["y"]
                         distance = math.sqrt(dx * dx + dy * dy)
 
-                        if distance < 40:  # Ajusta el rango de colisión según sea necesario
-                            # Cambiar el arma del jugador según el tipo de pickup
+                        if distance < 40:  # Adjust the collision range if necessary
+                            # Change the player's weapon based on the pickup type
                             player["weapon_type"] = pickup["weapon_type"]
-                            pickup["active"] = False  # Desactivar el pickup tras recogerlo
+                            pickup["active"] = False  # Deactivate the pickup after being collected
                             print(f"Player {player['id']} picked up {pickup['weapon_type']}")
                             break
 
 if __name__ == "__main__":
     server = Server()
-    server.start()  # Inicia el servidor
+    server.start()  # Inicia el servidor ```python

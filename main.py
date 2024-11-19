@@ -23,8 +23,6 @@ pygame.display.set_caption("ShipShoot")
 Clock = pygame.time.Clock()
 Font = pygame.font.Font(None, 36)  # Fuente para el texto
 
-
-
 # Conexión al servidor
 class Client:
     def __init__(self, host='localhost', port=5555):
@@ -67,12 +65,24 @@ class Client:
             except Exception as e:
                 print(f"Error al recibir datos: {e}")
                 break
+
     def send_data(self):
         try:
             # Envía la información del jugador al servidor
             self.client.send(pickle.dumps(self.player_info))
         except Exception as e:
             print(f"Error al enviar datos: {e}")
+
+    def check_pickup_collisions(self):
+        for pickup in self.pickups:
+            if pickup["active"]:
+                pickup_rect = pygame.Rect(pickup["x"], pickup["y"], 32, 32)  # Ajusta el tamaño según el pickup
+                player_rect = pygame.Rect(self.player_info["x"], self.player_info["y"], 32, 32)  # Ajusta el tamaño del jugador
+                
+                if player_rect.colliderect(pickup_rect):
+                    # Si hay colisión, enviar información al servidor
+                    self.client.send(pickle.dumps({"pickup_collected": pickup["weapon_type"], "pickup_position": (pickup["x"], pickup["y"])}))
+                    pickup["active"] = False  # Desactivar el pickup localmente
 
 # Función principal del juego
 def Main():
@@ -102,7 +112,7 @@ def Main():
         delta_time = Clock.tick(Settings.Fps)
 
         # Eventos del juego
-        for event in pygame.event.get():
+        for event in pygame .event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
@@ -163,7 +173,6 @@ def Main():
         Screen.blit(world.background, camera.apply(world))
         Player.draw(Screen, camera)
         Player.draw_health(Screen)
-        #Player.weapon.draw_bullets(Screen, camera)
         Player.weapon.DrawAmmo(Screen)
 
         # Dibujar a los demás jugadores remotos
@@ -198,15 +207,29 @@ def Main():
             bullet_rect.center = screen_pos
             Screen.blit(rotated_bullet, bullet_rect)
             
+        # Dibujar pickups y verificar colisiones
         for pickup in client.pickups:
             if pickup["active"]:
-                pickup_surface = pygame.Surface((32, 32), pygame.SRCALPHA)
-                pickup_surface.fill((0, 255, 0))  # Color verde para los pickups
-                pickup_rect = pickup_surface.get_rect(center=(pickup["x"], pickup["y"]))
-                Screen.blit(pickup_surface, pickup_rect)
+                weapon_type = pickup["weapon_type"]
+                pickup_image = None
+                
+                # Asignar la imagen correspondiente según el tipo de arma
+                if weapon_type == "LaserGun":
+                    pickup_image = pygame.image.load("assets/Sprites/Boosters/2.png").convert_alpha()
+                elif weapon_type == "MachineGun":
+                    pickup_image = pygame.image.load("assets/Sprites/Boosters/0.png").convert_alpha()
+                elif weapon_type == "RocketLauncher":
+                    pickup_image = pygame.image.load("assets/Sprites/Boosters/1.png").convert_alpha()
+
+                if pickup_image:
+                    pickup_rect = pickup_image.get_rect(center=(pickup["x"], pickup["y"]))
+                    Screen.blit(pickup_image, pickup_rect)
+
+        # Verificar colisiones con pickups
+        client.check_pickup_collisions()
 
         pygame.display.flip()
-        Clock.tick(Settings.Fps)
+        Clock .tick(Settings.Fps)
 
 if __name__ == "__main__":
     Main()
