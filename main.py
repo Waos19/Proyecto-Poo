@@ -28,7 +28,7 @@ Font = pygame.font.Font(None, 36)  # Fuente para el texto
 
 # Clase para manejar la conexión al servidor
 class Client:
-    def __init__(self, host='localhost', port=5555):
+    def __init__(self, host='26.128.187.2', port=5555):
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client.connect((host, port))
         self.buffer = ""  # Buffer para manejar mensajes fragmentados
@@ -91,7 +91,6 @@ class Client:
         try:
             # Serializar y enviar datos del jugador
             json_data = json.dumps(self.player_info).encode('utf-8') + b'\n'
-            print(f"Enviando datos del jugador: {json_data}")
             self.client.send(json_data)
         except Exception as e:
             print(f"Error al enviar datos: {e}")

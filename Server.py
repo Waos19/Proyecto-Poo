@@ -7,7 +7,7 @@ import math
 import Settings
 
 class Server:
-    def __init__(self, host='localhost', port=5555):
+    def __init__(self, host='26.128.187.2', port=5555):
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.bind((host, port))
         self.clients = []
@@ -38,7 +38,7 @@ class Server:
                 "color": (255, 255, 0),  # Amarillo para ametralladora
                 "size": 4,
                 "max_ammo": 100,
-                "shoot_cooldown": 500
+                "shoot_cooldown": 1
             },
             "RocketLauncher": {
                 "speed": 9,
@@ -115,8 +115,6 @@ class Server:
                     try:
                         received_data = json.loads(message)
 
-                        # Verificar qué datos se reciben
-                        print(f"Recibiendo datos del jugador {player_id}: {received_data}")
 
                         if "pickup_collected" in received_data:
                             weapon_type = received_data["pickup_collected"]
@@ -130,7 +128,7 @@ class Server:
                                             player["weapon_type"] = weapon_type
                                             # Asignar la munición correcta del nuevo arma
                                             player["ammo"] = self.weapon_attributes[weapon_type]["max_ammo"]
-                                            print(f"Pickup {weapon_type} recogido por el jugador {player_id}. Munición actualizada a {player['ammo']}")
+                                            #print(f"Pickup {weapon_type} recogido por el jugador {player_id}. Munición actualizada a {player['ammo']}")
                                             break
                                     break
 
@@ -152,7 +150,7 @@ class Server:
                                     "weapon_type": received_data.get("weapon_type", player["weapon_type"]),
                                     "is_alive": received_data.get("is_alive", player["is_alive"])
                                 }
-                                print(f"Datos actualizados para el jugador {player_id}: {self.player_data[i]}")  # Mostrar datos actualizados
+                                #print(f"Datos actualizados para el jugador {player_id}: {self.player_data[i]}")  # Mostrar datos actualizados
                                 break
 
                         # Verificar si se ha disparado un arma
@@ -188,13 +186,13 @@ class Server:
                 weapon_type = player["weapon_type"]
                 weapon_info = self.weapon_attributes[weapon_type]
 
-                # Verificar si el jugador puede disparar (si ha pasado el tiempo de recarga)
+                # Verificar si ha pasado el tiempo suficiente para disparar según el cooldown del arma
                 current_time = time.time()
                 if current_time - player["last_shot_time"] < weapon_info["shoot_cooldown"] / 1000.0:
-                    print(f"Jugador {player_id} no puede disparar todavía. Espera {weapon_info['shoot_cooldown'] / 1000.0 - (current_time - player['last_shot_time'])} segundos.")
-                    return  # No disparar si no ha pasado el tiempo suficiente
+                    # No disparar si no ha pasado el tiempo suficiente
+                    return
 
-                # Si el tiempo es suficiente, permitir disparar
+                # Si el jugador tiene munición y el cooldown se ha respetado
                 bullet = {
                     "shooter_id": player_id,
                     "x": player["x"],
@@ -203,8 +201,8 @@ class Server:
                     "speed": weapon_info["speed"],
                     "damage": weapon_info["damage"],
                     "weapon_type": weapon_type,
-                    "color": weapon_info["color"],  # El color de la bala
-                    "size": weapon_info["size"],    # El tamaño de la bala
+                    "color": weapon_info["color"],
+                    "size": weapon_info["size"],
                     "lifetime": weapon_info["lifetime"],
                     "creation_time": current_time
                 }
@@ -212,8 +210,7 @@ class Server:
 
                 # Reducir munición y actualizar el último tiempo de disparo
                 player["ammo"] -= 1
-                player["last_shot_time"] = current_time
-                print(f"Jugador {player_id} disparó con el arma {weapon_type}. Munición restante: {player['ammo']}")
+                player["last_shot_time"] = current_time  # Actualizar el tiempo del último disparo
 
 
     def update_bullets(self):
@@ -240,7 +237,7 @@ class Server:
                         if self.player_data[i]["health"] <= 0:
                             self.player_data[i]["is_alive"] = False
                             self.player_data[i]["health"] = 0
-                        print(f"Jugador {player['id']} impactado por {bullet['weapon_type']}. Daño: {bullet['damage']}. Salud restante: {self.player_data[i]['health']}")
+                        #print(f"Jugador {player['id']} impactado por {bullet['weapon_type']}. Daño: {bullet['damage']}. Salud restante: {self.player_data[i]['health']}")
                         hit_detected = True
                         break
 
@@ -276,10 +273,10 @@ class Server:
                         if distance < 40:
                             player["weapon_type"] = pickup["weapon_type"]
                             pickup["active"] = False
-                            print(f"Jugador {player['id']} recogió el pickup de {pickup['weapon_type']}.")
+                            #print(f"Jugador {player['id']} recogió el pickup de {pickup['weapon_type']}.")
                             # Actualizar la munición
                             player["ammo"] = self.weapon_attributes[pickup["weapon_type"]]["max_ammo"]
-                            print(f"Munición actualizada a {player['ammo']} para el jugador {player['id']}")
+                            #print(f"Munición actualizada a {player['ammo']} para el jugador {player['id']}")
                             break
 
 if __name__ == "__main__":
