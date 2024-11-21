@@ -81,7 +81,6 @@ class Character(pygame.sprite.Sprite):
 
     def draw(self, screen, camera):
         screen.blit(self.image, camera.apply(self))  # Asumiendo que camera.apply() ajusta la posición
-        self.draw_health(screen)
 
     def movement(self, dx, dy):
         if dx != 0 and dy != 0:

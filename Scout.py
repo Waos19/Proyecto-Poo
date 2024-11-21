@@ -9,7 +9,7 @@ class Scout(Character):
         image_path = os.path.join('assets', 'Sprites', 'Player', 'Nairan_-_Fighter_-_Engine_ Sprite.png')
         self.set_sprite(image_path)  # Cambiar sprite usando el método 'set_sprite'
 
-        self.max_health = 60  
+        self.max_health = 75  
         self.current_health = self.max_health
         self.max_ammo = 25  
         self.current_ammo = self.max_ammo

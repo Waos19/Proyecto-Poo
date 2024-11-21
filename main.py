@@ -11,6 +11,7 @@ from Menus import *
 from Fighter import Fighter
 from Tank import Tank
 from Scout import Scout
+from HealthDisplay import HealthDisplay
 
 # Inicializar pygame
 pygame.init()
@@ -30,6 +31,7 @@ class Client:
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client.connect((host, port))
         self.buffer = ""  # Buffer para manejar mensajes fragmentados
+        self.health_display = HealthDisplay()
         # Recibir el ID único del servidor
         data = self.client.recv(4096)
         initial_info = json.loads(data.decode('utf-8'))
@@ -123,6 +125,8 @@ def Main():
 
     # Iniciar el hilo para recibir datos
     threading.Thread(target=client.receive_data, daemon=True).start()
+    
+    health_display = HealthDisplay()
 
     # Bucle principal
     while True:
@@ -160,10 +164,13 @@ def Main():
         # Actualizar la información del jugador y verificar daño
         for player_info in client.players:
             if player_info["id"] == client.id:
-                Player.current_health = player_info["health"]  # Actualizar la salud directamente desde el servidor
+                health_display.draw_health(Screen, player_info["health"], 
+                                        camera.apply_pos((Player.x, Player.y))[0],
+                                        camera.apply_pos((Player.x, Player.y))[1])
+                Player.current_health = player_info["health"]
                 Player.is_alive = player_info["is_alive"]
                 if not Player.is_alive:
-                    Player.die()  # Esto manejará el respawn
+                    Player.die()
 
         # Actualizar la información del jugador
         client.player_info = {
@@ -190,8 +197,17 @@ def Main():
         # Dibujar fondo, jugador y otros elementos
         Screen.blit(world.background, camera.apply(world))
         Player.draw(Screen, camera)
-        Player.draw_health(Screen)
         Player.weapon.DrawAmmo(Screen)
+        
+        
+        # Dibujar la salud del jugador local
+        client.health_display.draw_health(
+            Screen, 
+            Player.current_health,
+            camera.apply_pos((Player.x, Player.y))[0],
+            camera.apply_pos((Player.x, Player.y))[1],
+            ship_type
+        )
 
         # Dibujar jugadores remotos
         for player_info in client.players:
@@ -206,13 +222,20 @@ def Main():
                 remote_player.is_alive = player_info.get("is_alive", True)
                 if remote_player.is_alive:
                     remote_player.angle = player_info["angle"]
-                    remote_player.current_health = player_info["health"]
                     visual_angle = remote_player.angle - 90
                     remote_player.update_frame()
                     remote_player.image = pygame.transform.rotate(remote_player.scaled_image, visual_angle)
                     remote_player.rect = remote_player.image.get_rect(center=(remote_player.x, remote_player.y))
                     remote_player.draw(Screen, camera)
-
+                    
+                    # Dibujar la salud del jugador remoto con su tipo específico
+                    client.health_display.draw_health(
+                        Screen,
+                        player_info["health"],
+                        camera.apply_pos((remote_player.x, remote_player.y))[0],
+                        camera.apply_pos((remote_player.x, remote_player.y))[1],
+                        player_info["ship_type"]
+                    )
         # Dibujar balas
         for bullet in client.bullets:
             pygame.draw.circle(Screen, (255, 0, 0), camera.apply_pos((bullet["x"], bullet["y"])), 5)
