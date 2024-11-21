@@ -250,7 +250,7 @@ def Main():
             if pickup["active"]:
                 weapon_type = pickup["weapon_type"]
                 pickup_image = None
-                
+
                 # Asignar la imagen correspondiente según el tipo de arma
                 if weapon_type == "LaserGun":
                     pickup_image = pygame.image.load("assets/Sprites/Boosters/2.png").convert_alpha()
@@ -260,9 +260,10 @@ def Main():
                     pickup_image = pygame.image.load("assets/Sprites/Boosters/1.png").convert_alpha()
 
                 if pickup_image:
-                    pickup_rect = pickup_image.get_rect(center=(pickup["x"], pickup["y"]))
+                    # Obtener posición ajustada por la cámara
+                    pickup_pos = camera.apply_pos((pickup["x"], pickup["y"]))
+                    pickup_rect = pickup_image.get_rect(center=pickup_pos)
                     Screen.blit(pickup_image, pickup_rect)
-
         # Verificar colisiones con pickups
         client.check_pickup_collisions()
 
