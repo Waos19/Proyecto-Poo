@@ -27,7 +27,7 @@ Font = pygame.font.Font(None, 36)  # Fuente para el texto
 
 # Clase para manejar la conexión al servidor
 class Client:
-    def __init__(self, host='26.128.187.2', port=5555):
+    def __init__(self, host='localhost', port=5555):
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client.connect((host, port))
         self.buffer = ""  # Buffer para manejar mensajes fragmentados
@@ -238,7 +238,12 @@ def Main():
                     )
         # Dibujar balas
         for bullet in client.bullets:
-            pygame.draw.circle(Screen, (255, 0, 0), camera.apply_pos((bullet["x"], bullet["y"])), 5)
+            pygame.draw.circle(
+                Screen, 
+                bullet["color"],  # Usar el color específico del tipo de bala
+                camera.apply_pos((bullet["x"], bullet["y"])), 
+                bullet["size"]    # Usar el tamaño específico del tipo de bala
+            )
 
         # Dibujar pickups y verificar colisiones
         for pickup in client.pickups:

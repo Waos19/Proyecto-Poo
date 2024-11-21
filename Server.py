@@ -7,7 +7,7 @@ import math
 import Settings
 
 class Server:
-    def __init__(self, host='26.128.187.2', port=5555):
+    def __init__(self, host='localhost', port=5555):
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.bind((host, port))
         self.clients = []
@@ -19,6 +19,48 @@ class Server:
         self.weapon_types = ["LaserGun", "MachineGun", "RocketLauncher"]
         self.spawn_interval = 3000  # Tiempo en milisegundos
         self.last_spawn_time = time.time()
+        
+        # Definir los atributos de cada tipo de arma
+        self.weapon_attributes = {
+            "LaserGun": {
+                "speed": 12,
+                "damage": 5,
+                "lifetime": 1.0,
+                "color": (0, 255, 0),  # Verde para láser
+                "size": 3,
+                "max_ammo": 50,
+                "shoot_cooldown": 80
+            },
+            "MachineGun": {
+                "speed": 8.5,
+                "damage": 7,
+                "lifetime": 1.5,
+                "color": (255, 255, 0),  # Amarillo para ametralladora
+                "size": 4,
+                "max_ammo": 100,
+                "shoot_cooldown": 650
+            },
+            "RocketLauncher": {
+                "speed": 9,
+                "damage": 20,
+                "lifetime": 2.0,
+                "color": (255, 0, 0),  # Rojo para cohetes
+                "size": 6,
+                "max_ammo": 5,
+                "shoot_cooldown": 1000
+            },
+            "Pistol": {
+                "speed": 5,
+                "damage": 3,
+                "lifetime": 1.5,
+                "color": (255, 165, 0),  # Naranja para pistola
+                "size": 4,
+                "max_ammo": 12,
+                "shoot_cooldown": 500
+            }
+        }
+        
+        
 
     def start(self):
         self.server.listen()
@@ -54,8 +96,9 @@ class Server:
             "y": 0,
             "angle": 0,
             "health": 100,
-            "ammo": 20,
+            "ammo": self.weapon_attributes["Pistol"]["max_ammo"],  # Comenzar con la munición de la pistola
             "ship_type": "Fighter",
+            "weapon_type": "Pistol",  # Arma por defecto
             "is_alive": True
         })
         
@@ -79,21 +122,26 @@ class Server:
                             for pickup in self.pickups:
                                 if pickup["active"] and (pickup["x"], pickup["y"]) == pickup_position:
                                     pickup["active"] = False
+                                    # Actualizar el tipo de arma y la munición del jugador
+                                    for player in self.player_data:
+                                        if player["id"] == player_id:
+                                            player["weapon_type"] = weapon_type
+                                            player["ammo"] = self.weapon_attributes[weapon_type]["max_ammo"]
                                     print(f"Pickup {weapon_type} recogido por el jugador {player_id}")
                                     break
 
-                        # Actualizar datos del jugador directamente
+                        # Actualizar datos del jugador
                         for i, player in enumerate(self.player_data):
                             if player["id"] == player_id:
-                                # Actualizar todos los campos del jugador
                                 self.player_data[i] = {
-                                    **player,  # Mantener datos existentes
+                                    **player,
                                     "x": received_data.get("x", player["x"]),
                                     "y": received_data.get("y", player["y"]),
                                     "angle": received_data.get("angle", player["angle"]),
                                     "health": received_data.get("health", player["health"]),
                                     "ammo": received_data.get("ammo", player["ammo"]),
                                     "ship_type": received_data.get("ship_type", player["ship_type"]),
+                                    "weapon_type": received_data.get("weapon_type", player["weapon_type"]),
                                     "is_alive": received_data.get("is_alive", player["is_alive"])
                                 }
                                 if self.player_data[i]["health"] <= 0:
@@ -102,17 +150,27 @@ class Server:
                                 break
 
                         if "shot_fired" in received_data and received_data["shot_fired"]:
-                            new_bullet = {
-                                "x": received_data["x"],
-                                "y": received_data["y"],
-                                "angle": received_data["angle"],
-                                "shooter_id": player_id,
-                                "creation_time": time.time(),
-                                "speed": 15,
-                                "damage": 25,
-                                "active": True
-                            }
-                            self.bullets.append(new_bullet)
+                            # Obtener el tipo de arma actual del jugador
+                            shooter = next((p for p in self.player_data if p["id"] == player_id), None)
+                            if shooter:
+                                weapon_type = shooter.get("weapon_type", "Pistol")
+                                weapon_attrs = self.weapon_attributes[weapon_type]
+                                
+                                new_bullet = {
+                                    "x": received_data["x"],
+                                    "y": received_data["y"],
+                                    "angle": received_data["angle"],
+                                    "shooter_id": player_id,
+                                    "creation_time": time.time(),
+                                    "weapon_type": weapon_type,
+                                    "speed": weapon_attrs["speed"],
+                                    "damage": weapon_attrs["damage"],
+                                    "lifetime": weapon_attrs["lifetime"],
+                                    "color": weapon_attrs["color"],
+                                    "size": weapon_attrs["size"],
+                                    "active": True
+                                }
+                                self.bullets.append(new_bullet)
 
                     except json.JSONDecodeError as e:
                         print(f"Error decodificando JSON: {e}")
@@ -142,7 +200,8 @@ class Server:
         updated_bullets = []
 
         for bullet in self.bullets:
-            if current_time - bullet["creation_time"] > 2.0:
+            # Verificar el tiempo de vida según el tipo de bala
+            if current_time - bullet["creation_time"] > bullet["lifetime"]:
                 continue
 
             bullet["x"] += math.cos(math.radians(bullet["angle"])) * bullet["speed"]
@@ -160,7 +219,7 @@ class Server:
                         if self.player_data[i]["health"] <= 0:
                             self.player_data[i]["is_alive"] = False
                             self.player_data[i]["health"] = 0
-                        print(f"Jugador {player['id']} impactado. Salud: {self.player_data[i]['health']}")
+                        print(f"Jugador {player['id']} impactado por {bullet['weapon_type']}. Daño: {bullet['damage']}. Salud restante: {self.player_data[i]['health']}")
                         hit_detected = True
                         break
 
