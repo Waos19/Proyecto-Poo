@@ -15,7 +15,7 @@ from WeaponsPickupManager import WeaponPickupsManager
 Clock = pygame.time.Clock()
 
 # Inicializar Pygame
-pygame.init()
+pygame.mixer.init()
 
 # Cargar fondos
 def cargar_fondos():
@@ -117,7 +117,7 @@ def seleccionar_nave(screen, button_back, ship_1, ship_2, ship_3, button_play, c
 # Función principal del menú
 def Menu():
     screen = pygame.display.set_mode((800, 600))
-    pygame.display.set_caption("Prueba menu")
+    pygame.display.set_caption("ShipShooter")
 
     background, background_2, background_3 = cargar_fondos()
     clic_boton = configurar_musica()
@@ -200,6 +200,7 @@ def Menu():
 
         # Actualizar la pantalla
         pygame.display.flip()
+        Clock.tick(Settings.Fps)
 
 
 

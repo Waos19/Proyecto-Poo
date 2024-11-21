@@ -1,6 +1,6 @@
 import socket
 import threading
-import pickle
+import json
 import random
 import time
 import math
@@ -13,12 +13,12 @@ class Server:
         self.clients = []
         self.player_data = []
         self.bullets = []
-        self.pickups = []  # Lista para almacenar pickups
+        self.pickups = []
         self.running = True
         self.id_counter = 0
         self.weapon_types = ["LaserGun", "MachineGun", "RocketLauncher"]
-        self.spawn_interval = 3000  # Tiempo entre la generación de pickups
-        self.last_spawn_time = time.time()  # Última vez que se generó un pickup
+        self.spawn_interval = 3000  # Tiempo en milisegundos
+        self.last_spawn_time = time.time()
 
     def start(self):
         self.server.listen()
@@ -28,14 +28,14 @@ class Server:
             print(f"Conectado a {addr}")
             player_id = self.id_counter
             self.id_counter += 1
-            client.send(pickle.dumps({"id": player_id}))
+            client.send(json.dumps({"id": player_id}).encode('utf-8'))
             self.clients.append(client)
             threading.Thread(target=self.handle_client, args=(client, player_id)).start()
 
     def update_pickups(self):
-        # Generar pickups a intervalos regulares
-        if time.time() - self.last_spawn_time > self.spawn_interval / 1000:  # Convertir a segundos
-            if len(self.pickups) < 1000:  # Limitar la cantidad de pickups en el mapa
+        # Crear nuevos pickups periódicamente
+        if time.time() - self.last_spawn_time > self.spawn_interval / 1000:
+            if len(self.pickups) < 1000:
                 pos = (random.randint(0, Settings.world_width), random.randint(0, Settings.world_height))
                 weapon_type = random.choice(self.weapon_types)
                 pickup = {
@@ -45,9 +45,10 @@ class Server:
                     "active": True
                 }
                 self.pickups.append(pickup)
-                self.last_spawn_time = time.time()  # Reiniciar el temporizador
+                self.last_spawn_time = time.time()
 
     def handle_client(self, client, player_id):
+        # Agregar jugador a la lista
         self.player_data.append({
             "id": player_id,
             "x": 0,
@@ -65,28 +66,28 @@ class Server:
                 if not data:
                     break
 
-                received_data = pickle.loads(data)
+                received_data = json.loads(data.decode('utf-8'))
 
-                # Manejar recogida de pickups
+                # Si se recoge un pickup, desactivarlo
                 if "pickup_collected" in received_data:
                     weapon_type = received_data["pickup_collected"]
                     pickup_position = received_data["pickup_position"]
                     for pickup in self.pickups:
                         if pickup["active"] and (pickup["x"], pickup["y"]) == pickup_position:
-                            pickup["active"] = False  # Desactivar el pickup
+                            pickup["active"] = False
                             print(f"Pickup {weapon_type} recogido por el jugador {player_id}")
                             break
 
-                # Update player position and other data
-                for i, player in enumerate(self.player_data):
+                # Actualizar datos del jugador
+                for player in self.player_data:
                     if player["id"] == player_id:
-                        player.update(received_data)
+                        player.update(received_data)  # El ángulo se incluye automáticamente aquí
                         if player["health"] <= 0:
                             player["is_alive"] = False
-                            player["health"] = 100  # Restaurar salud al morir
+                            player["health"] = 100
                         break
 
-                # Handle bullet creation
+                # Si el jugador disparó, crear una nueva bala
                 if "shot_fired" in received_data and received_data["shot_fired"]:
                     new_bullet = {
                         "x": received_data["x"],
@@ -100,15 +101,16 @@ class Server:
                     }
                     self.bullets.append(new_bullet)
 
+                # Actualizar las balas, pickups y verificar colisiones
                 self.update_bullets()
-                self.update_pickups()  # Actualizar pickups
-                self.handle_pickup_collision()  # Manejar colisiones de pickups
+                self.update_pickups()
+                self.handle_pickup_collision()
 
-                # Send updated game state
+                # Generar el estado del juego y enviarlo a los clientes
                 game_state = {
                     "players": self.player_data,
                     "bullets": self.bullets,
-                    "pickups": self.pickups  # Enviar pickups a los clientes
+                    "pickups": self.pickups
                 }
                 self.broadcast(game_state)
 
@@ -116,7 +118,7 @@ class Server:
                 print(f"Error handling client: {e}")
                 break
 
-        # Remove player data when they disconnect
+        # Eliminar jugador desconectado de la lista
         self.player_data = [p for p in self.player_data if p["id"] != player_id]
         if client in self.clients:
             self.clients.remove(client)
@@ -125,8 +127,9 @@ class Server:
         current_time = time.time()
         updated_bullets = []
 
+        # Actualizar la posición de las balas y verificar colisiones con los jugadores
         for bullet in self.bullets:
-            if current_time - bullet["creation_time"] > 2.0:
+            if current_time - bullet["creation_time"] > 2.0:  # Las balas se eliminan después de 2 segundos
                 continue
 
             bullet["x"] += math.cos(math.radians(bullet["angle"])) * bullet["speed"]
@@ -139,11 +142,11 @@ class Server:
                     dy = player["y"] - bullet["y"]
                     distance = math.sqrt(dx * dx + dy * dy)
 
-                    if distance < 40:
+                    if distance < 40:  # Distancia de impacto
                         player["health"] = max(0, player["health"] - bullet["damage"])
                         if player["health"] <= 0:
                             player["is_alive"] = False
-                        print(f"Hit player {player['id']}! Health: {player['health']}")
+                        print(f"Impacto en el jugador {player['id']}! Salud: {player['health']}")
                         hit_detected = True
                         break
 
@@ -156,10 +159,11 @@ class Server:
         dead_clients = []
         for client in self.clients:
             try:
-                client.send(pickle.dumps(data))
+                client.send((json.dumps(data) + '\n').encode('utf-8'))
             except:
                 dead_clients.append(client)
 
+        # Eliminar clientes desconectados
         for client in dead_clients:
             self.clients.remove(client)
 
@@ -172,13 +176,13 @@ class Server:
                         dy = player["y"] - pickup["y"]
                         distance = math.sqrt(dx * dx + dy * dy)
 
-                        if distance < 40:  # Adjust the collision range if necessary
-                            # Change the player's weapon based on the pickup type
+                        # Si el jugador está cerca del pickup, recogerlo
+                        if distance < 40:
                             player["weapon_type"] = pickup["weapon_type"]
-                            pickup["active"] = False  # Deactivate the pickup after being collected
-                            print(f"Player {player['id']} picked up {pickup['weapon_type']}")
+                            pickup["active"] = False
+                            print(f"Player {player['id']} recogió {pickup['weapon_type']}")
                             break
 
 if __name__ == "__main__":
     server = Server()
-    server.start()  # Inicia el servidor ```python
+    server.start()

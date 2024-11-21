@@ -1,7 +1,7 @@
 import pygame
 import sys
 import socket
-import pickle
+import json  # Se usa JSON para serialización/deserialización
 import threading
 import Settings
 from World import World
@@ -23,15 +23,17 @@ pygame.display.set_caption("ShipShoot")
 Clock = pygame.time.Clock()
 Font = pygame.font.Font(None, 36)  # Fuente para el texto
 
-# Conexión al servidor
+
+# Clase para manejar la conexión al servidor
 class Client:
     def __init__(self, host='localhost', port=5555):
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client.connect((host, port))
+        self.buffer = ""  # Buffer para manejar mensajes fragmentados
         
-        # Recibir el ID único del servidor al conectarse
+        # Recibir el ID único del servidor
         data = self.client.recv(4096)
-        initial_info = pickle.loads(data)
+        initial_info = json.loads(data.decode('utf-8'))
         self.id = initial_info["id"]
         print(f"Conectado al servidor con ID: {self.id}")
         
@@ -48,17 +50,25 @@ class Client:
         }
         self.players = []
         self.bullets = []
-        self.pickups = []  # Lista para almacenar los pickups remotos
+        self.pickups = []
 
     def receive_data(self):
         while True:
             try:
-                data = self.client.recv(4096)
+                # Recibir datos y acumularlos en el buffer
+                data = self.client.recv(4096).decode('utf-8')
                 if data:
-                    game_data = pickle.loads(data)
-                    self.players = game_data["players"]
-                    self.bullets = game_data["bullets"]
-                    self.pickups = game_data["pickups"]  # Recibe los pickups
+                    self.buffer += data
+                    # Procesar mensajes completos en el buffer
+                    while '\n' in self.buffer:
+                        message, self.buffer = self.buffer.split('\n', 1)
+                        try:
+                            game_data = json.loads(message)
+                            self.players = game_data["players"]
+                            self.bullets = game_data["bullets"]
+                            self.pickups = game_data["pickups"]
+                        except json.JSONDecodeError as e:
+                            print(f"Error al procesar mensaje JSON: {e}")
                 else:
                     print("El servidor ha cerrado la conexión.")
                     break
@@ -68,21 +78,29 @@ class Client:
 
     def send_data(self):
         try:
-            # Envía la información del jugador al servidor
-            self.client.send(pickle.dumps(self.player_info))
+            # Serializar y enviar datos del jugador
+            json_data = json.dumps(self.player_info).encode('utf-8') + b'\n'
+            self.client.send(json_data)
         except Exception as e:
             print(f"Error al enviar datos: {e}")
 
     def check_pickup_collisions(self):
         for pickup in self.pickups:
             if pickup["active"]:
-                pickup_rect = pygame.Rect(pickup["x"], pickup["y"], 32, 32)  # Ajusta el tamaño según el pickup
-                player_rect = pygame.Rect(self.player_info["x"], self.player_info["y"], 32, 32)  # Ajusta el tamaño del jugador
-                
+                pickup_rect = pygame.Rect(pickup["x"], pickup["y"], 32, 32)
+                player_rect = pygame.Rect(self.player_info["x"], self.player_info["y"], 32, 32)
                 if player_rect.colliderect(pickup_rect):
-                    # Si hay colisión, enviar información al servidor
-                    self.client.send(pickle.dumps({"pickup_collected": pickup["weapon_type"], "pickup_position": (pickup["x"], pickup["y"])}))
-                    pickup["active"] = False  # Desactivar el pickup localmente
+                    # Enviar datos de la colisión al servidor
+                    collision_data = {
+                        "pickup_collected": pickup["weapon_type"],
+                        "pickup_position": (pickup["x"], pickup["y"])
+                    }
+                    try:
+                        self.client.send(json.dumps(collision_data).encode('utf-8') + b'\n')
+                    except Exception as e:
+                        print(f"Error al enviar datos de colisión: {e}")
+                    pickup["active"] = False
+
 
 # Función principal del juego
 def Main():
@@ -90,8 +108,8 @@ def Main():
     world = World(1920, 1200)
     camera = Camera(world.width, world.height)
 
-    # Ejecutar el menú de selección de nave y obtener el tipo de nave seleccionado
-    ship_type = Menu()  # Ahora esta función devuelve un string con el tipo de nave seleccionado
+    # Ejecutar el menú de selección de nave
+    ship_type = Menu()
 
     # Crear el jugador según el tipo de nave
     if ship_type == "Fighter":
@@ -101,18 +119,17 @@ def Main():
     elif ship_type == "Scout":
         Player = Scout(Settings.Width // 2, Settings.Height // 2)
 
-    # Crear el cliente y conectar al servidor
+    # Crear el cliente
     client = Client()
 
-    # Iniciar el hilo para recibir datos del servidor
+    # Iniciar el hilo para recibir datos
     threading.Thread(target=client.receive_data, daemon=True).start()
 
-    # Bucle principal del juego
+    # Bucle principal
     while True:
-        delta_time = Clock.tick(Settings.Fps)
 
-        # Eventos del juego
-        for event in pygame .event.get():
+        # Eventos
+        for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
@@ -130,15 +147,18 @@ def Main():
             dy += Player.speed
         if keys[pygame.K_r]:
             Player.weapon.reload()
+            
+        camera.update(Player)
 
         # Acción con el ratón
         Mouse = pygame.mouse.get_pressed()
         shot_fired = False
-        if Mouse[0]:  # Si el botón izquierdo del ratón está presionado
-            angle = Player.lookAtMouse(camera)  # Calcula el ángulo para rotar hacia el mouse
-            if Player.weapon.shoot(angle):  # Si el disparo fue exitoso
+        if Mouse[0]:
+            angle = Player.lookAtMouse(camera)
+            if Player.weapon.shoot(angle):
                 shot_fired = True
 
+        # Actualizar la información del jugador
         client.player_info = {
             "id": client.id,
             "x": Player.x,
@@ -147,35 +167,23 @@ def Main():
             "health": Player.current_health,
             "ammo": Player.weapon.current_ammo,
             "ship_type": ship_type,
-            "shot_fired": shot_fired,  # Añadir esta información
+            "shot_fired": shot_fired,
             "is_alive": Player.is_alive
         }
-        
-        # Actualizar estado del jugador desde el servidor
-        for player_info in client.players:
-            if player_info["id"] == client.id:
-                if player_info["health"] != Player.current_health:
-                    Player.take_damage(Player.current_health - player_info["health"])
-    
         client.send_data()
 
-        # Mover al jugador
+        # Mover y rotar el jugador
         Player.movement(dx, dy)
-
-        # Rotar el personaje hacia el ratón
         Player.lookAtMouse(camera)
-
-        # Actualizar los métodos del jugador
         Player.update()
-        camera.update(Player)
 
-        # Dibujar en pantalla
+        # Dibujar fondo, jugador y otros elementos
         Screen.blit(world.background, camera.apply(world))
         Player.draw(Screen, camera)
         Player.draw_health(Screen)
         Player.weapon.DrawAmmo(Screen)
 
-        # Dibujar a los demás jugadores remotos
+        # Dibujar jugadores remotos
         for player_info in client.players:
             if player_info["id"] != client.id:
                 if player_info["ship_type"] == "Fighter":
@@ -195,18 +203,10 @@ def Main():
                     remote_player.rect = remote_player.image.get_rect(center=(remote_player.x, remote_player.y))
                     remote_player.draw(Screen, camera)
 
-        # Dibujar balas remotas
+        # Dibujar balas
         for bullet in client.bullets:
-            bullet_x = bullet["x"]
-            bullet_y = bullet["y"]
-            bullet_surface = pygame.Surface((10, 20), pygame.SRCALPHA)
-            bullet_surface.fill((255, 0, 0))  # Rojo para las balas
-            rotated_bullet = pygame.transform.rotate(bullet_surface, -bullet["angle"])
-            bullet_rect = rotated_bullet.get_rect(center=(bullet_x, bullet_y))
-            screen_pos = camera.apply_pos((bullet_x, bullet_y))
-            bullet_rect.center = screen_pos
-            Screen.blit(rotated_bullet, bullet_rect)
-            
+            pygame.draw.circle(Screen, (255, 0, 0), camera.apply_pos((bullet["x"], bullet["y"])), 5)
+
         # Dibujar pickups y verificar colisiones
         for pickup in client.pickups:
             if pickup["active"]:
@@ -229,7 +229,8 @@ def Main():
         client.check_pickup_collisions()
 
         pygame.display.flip()
-        Clock .tick(Settings.Fps)
+        Clock.tick(Settings.Fps)
+
 
 if __name__ == "__main__":
     Main()
