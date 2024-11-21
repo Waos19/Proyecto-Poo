@@ -32,11 +32,6 @@ class Weapon:
             return True
         return False
 
-    def reload(self):
-        if not self.reloading and self.current_ammo < self.max_ammo:
-            self.reloading = True
-            self.last_reload_time = pygame.time.get_ticks()
-
 
     def DrawAmmo(self, screen):
         ammo_text = self.font.render(f'Municion: {self.current_ammo}', True, (255, 255, 255))

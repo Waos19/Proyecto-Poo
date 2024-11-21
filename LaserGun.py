@@ -18,49 +18,5 @@ class LaserGun(Weapon):
         self.heat_dissipation_rate = 2  # Cuánto se enfría por cada frame si no dispara
         self.is_overheated = False  # Estado de sobrecalentamiento
         self.damage = 5
-
-    def shoot(self, angle):
-        current_time = pygame.time.get_ticks()
-        
-        # Disparar solo si no está sobrecalentada
-        if not self.reloading and not self.is_overheated and (current_time - self.last_shot_time) > self.shoot_cooldown:
-            bullet = Bullet(self.shooter.rect.center, angle, self.shooter, self.damage, self.bullet_speed)
-            self.bullets.add(bullet)
-            self.last_shot_time = current_time
-            
-            # Aumentar el calor
-            self.heat += self.heat_increase_per_shot
-            if self.heat >= self.max_heat:
-                self.is_overheated = True  # Sobrecargar el arma si llega al límite
-            
-            return True  # Indicar que se disparó correctamente
-        return False  # Indicar que no se pudo disparar
-
-    def update(self):
-        # Si está sobrecalentada, comprobar si el calor ha bajado lo suficiente para reactivarse
-        if self.is_overheated and self.heat <= self.overheat_threshold:
-            self.is_overheated = False
-
-        # Disipar el calor si no está disparando
-        if self.heat > 0:
-            self.heat -= self.heat_dissipation_rate
-            self.heat = max(0, self.heat)  # Asegurarse de que el calor no sea negativo
-
-        # Llamar a la actualización de Weapon (para recargar y otras funciones)
-        super().update()
-
-    def draw_heat_bar(self, screen):
-        # Dibujar la barra de sobrecalentamiento en la pantalla
-        bar_width = 200
-        bar_height = 20
-        bar_x = 10
-        bar_y = 80
-        
-        # Progreso de la barra (basado en el calor actual)
-        heat_ratio = self.heat / self.max_heat
-        filled_width = bar_width * heat_ratio
-        bar_color = (255, 0, 0) if self.is_overheated else (255, 165, 0)  # Cambia de color si está sobrecalentada
-
-        # Dibujar la barra
-        pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_width, bar_height), 2)  # Bordes de la barra
-        pygame.draw.rect(screen, bar_color, (bar_x, bar_y, filled_width, bar_height))  # Relleno de la barra
+        self.bullet_speed = 12
+        self.bullets = []

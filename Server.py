@@ -19,7 +19,7 @@ class Server:
         self.weapon_types = ["LaserGun", "MachineGun", "RocketLauncher"]
         self.spawn_interval = 3000  # Tiempo en milisegundos
         self.last_spawn_time = time.time()
-        
+
         # Definir los atributos de cada tipo de arma
         self.weapon_attributes = {
             "LaserGun": {
@@ -38,7 +38,7 @@ class Server:
                 "color": (255, 255, 0),  # Amarillo para ametralladora
                 "size": 4,
                 "max_ammo": 100,
-                "shoot_cooldown": 650
+                "shoot_cooldown": 500
             },
             "RocketLauncher": {
                 "speed": 9,
@@ -60,8 +60,6 @@ class Server:
             }
         }
         
-        
-
     def start(self):
         self.server.listen()
         print("Servidor iniciado y esperando conexiones...")
@@ -99,7 +97,8 @@ class Server:
             "ammo": self.weapon_attributes["Pistol"]["max_ammo"],  # Comenzar con la munición de la pistola
             "ship_type": "Fighter",
             "weapon_type": "Pistol",  # Arma por defecto
-            "is_alive": True
+            "is_alive": True,
+            "last_shot_time": 0
         })
         
         buffer = ""
@@ -115,7 +114,10 @@ class Server:
                     message, buffer = buffer.split('\n', 1)
                     try:
                         received_data = json.loads(message)
-                        
+
+                        # Verificar qué datos se reciben
+                        print(f"Recibiendo datos del jugador {player_id}: {received_data}")
+
                         if "pickup_collected" in received_data:
                             weapon_type = received_data["pickup_collected"]
                             pickup_position = received_data["pickup_position"]
@@ -126,11 +128,17 @@ class Server:
                                     for player in self.player_data:
                                         if player["id"] == player_id:
                                             player["weapon_type"] = weapon_type
+                                            # Asignar la munición correcta del nuevo arma
                                             player["ammo"] = self.weapon_attributes[weapon_type]["max_ammo"]
-                                    print(f"Pickup {weapon_type} recogido por el jugador {player_id}")
+                                            print(f"Pickup {weapon_type} recogido por el jugador {player_id}. Munición actualizada a {player['ammo']}")
+                                            break
                                     break
 
-                        # Actualizar datos del jugador
+                        # Recargar arma
+                        if "reload" in received_data and received_data["reload"]:
+                            self.reload(player_id)
+
+                        # Actualizar los datos del jugador con los datos recibidos
                         for i, player in enumerate(self.player_data):
                             if player["id"] == player_id:
                                 self.player_data[i] = {
@@ -144,56 +152,69 @@ class Server:
                                     "weapon_type": received_data.get("weapon_type", player["weapon_type"]),
                                     "is_alive": received_data.get("is_alive", player["is_alive"])
                                 }
-                                if self.player_data[i]["health"] <= 0:
-                                    self.player_data[i]["is_alive"] = False
-                                    self.player_data[i]["health"] = 0
+                                print(f"Datos actualizados para el jugador {player_id}: {self.player_data[i]}")  # Mostrar datos actualizados
                                 break
 
+                        # Verificar si se ha disparado un arma
                         if "shot_fired" in received_data and received_data["shot_fired"]:
-                            # Obtener el tipo de arma actual del jugador
-                            shooter = next((p for p in self.player_data if p["id"] == player_id), None)
-                            if shooter:
-                                weapon_type = shooter.get("weapon_type", "Pistol")
-                                weapon_attrs = self.weapon_attributes[weapon_type]
-                                
-                                new_bullet = {
-                                    "x": received_data["x"],
-                                    "y": received_data["y"],
-                                    "angle": received_data["angle"],
-                                    "shooter_id": player_id,
-                                    "creation_time": time.time(),
-                                    "weapon_type": weapon_type,
-                                    "speed": weapon_attrs["speed"],
-                                    "damage": weapon_attrs["damage"],
-                                    "lifetime": weapon_attrs["lifetime"],
-                                    "color": weapon_attrs["color"],
-                                    "size": weapon_attrs["size"],
-                                    "active": True
-                                }
-                                self.bullets.append(new_bullet)
+                            self.shoot(player_id, received_data["angle"])
 
                     except json.JSONDecodeError as e:
                         print(f"Error decodificando JSON: {e}")
                         continue
 
-                self.update_bullets()
-                self.update_pickups()
-                self.handle_pickup_collision()
+                    self.update_bullets()
+                    self.update_pickups()
+                    self.handle_pickup_collision()
 
-                game_state = {
-                    "players": self.player_data,
-                    "bullets": self.bullets,
-                    "pickups": self.pickups
-                }
-                self.broadcast(game_state)
+                    game_state = {
+                        "players": self.player_data,
+                        "bullets": self.bullets,
+                        "pickups": self.pickups
+                    }
+                    self.broadcast(game_state)
 
             except Exception as e:
-                print(f"Error handling client: {e}")
+                print(f"Error manejando el cliente: {e}")
                 break
 
         self.player_data = [p for p in self.player_data if p["id"] != player_id]
         if client in self.clients:
             self.clients.remove(client)
+
+    def shoot(self, player_id, angle):
+        for player in self.player_data:
+            if player["id"] == player_id and player["is_alive"] and player["ammo"] > 0:
+                weapon_type = player["weapon_type"]
+                weapon_info = self.weapon_attributes[weapon_type]
+
+                # Verificar si el jugador puede disparar (si ha pasado el tiempo de recarga)
+                current_time = time.time()
+                if current_time - player["last_shot_time"] < weapon_info["shoot_cooldown"] / 1000.0:
+                    print(f"Jugador {player_id} no puede disparar todavía. Espera {weapon_info['shoot_cooldown'] / 1000.0 - (current_time - player['last_shot_time'])} segundos.")
+                    return  # No disparar si no ha pasado el tiempo suficiente
+
+                # Si el tiempo es suficiente, permitir disparar
+                bullet = {
+                    "shooter_id": player_id,
+                    "x": player["x"],
+                    "y": player["y"],
+                    "angle": angle,
+                    "speed": weapon_info["speed"],
+                    "damage": weapon_info["damage"],
+                    "weapon_type": weapon_type,
+                    "color": weapon_info["color"],  # El color de la bala
+                    "size": weapon_info["size"],    # El tamaño de la bala
+                    "lifetime": weapon_info["lifetime"],
+                    "creation_time": current_time
+                }
+                self.bullets.append(bullet)
+
+                # Reducir munición y actualizar el último tiempo de disparo
+                player["ammo"] -= 1
+                player["last_shot_time"] = current_time
+                print(f"Jugador {player_id} disparó con el arma {weapon_type}. Munición restante: {player['ammo']}")
+
 
     def update_bullets(self):
         current_time = time.time()
@@ -255,7 +276,10 @@ class Server:
                         if distance < 40:
                             player["weapon_type"] = pickup["weapon_type"]
                             pickup["active"] = False
-                            print(f"Player {player['id']} recogió {pickup['weapon_type']}")
+                            print(f"Jugador {player['id']} recogió el pickup de {pickup['weapon_type']}.")
+                            # Actualizar la munición
+                            player["ammo"] = self.weapon_attributes[pickup["weapon_type"]]["max_ammo"]
+                            print(f"Munición actualizada a {player['ammo']} para el jugador {player['id']}")
                             break
 
 if __name__ == "__main__":

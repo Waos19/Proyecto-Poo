@@ -12,6 +12,7 @@ from Fighter import Fighter
 from Tank import Tank
 from Scout import Scout
 from HealthDisplay import HealthDisplay
+import time
 
 # Inicializar pygame
 pygame.init()
@@ -32,6 +33,8 @@ class Client:
         self.client.connect((host, port))
         self.buffer = ""  # Buffer para manejar mensajes fragmentados
         self.health_display = HealthDisplay()
+        self.last_shot_time = 0  # Tiempo del último disparo
+        self.shoot_cooldown = 0  # Cooldown de disparo
         # Recibir el ID único del servidor
         data = self.client.recv(4096)
         initial_info = json.loads(data.decode('utf-8'))
@@ -56,18 +59,25 @@ class Client:
     def receive_data(self):
         while True:
             try:
-                # Recibir datos y acumularlos en el buffer
                 data = self.client.recv(4096).decode('utf-8')
                 if data:
                     self.buffer += data
-                    # Procesar mensajes completos en el buffer
                     while '\n' in self.buffer:
                         message, self.buffer = self.buffer.split('\n', 1)
                         try:
                             game_data = json.loads(message)
-                            self.players = game_data["players"]
+                            self.players = game_data["players"]  # Actualizar la lista de jugadores
                             self.bullets = game_data["bullets"]
                             self.pickups = game_data["pickups"]
+
+                            # Actualizar el estado local del jugador
+                            for player_info in self.players:
+                                if player_info["id"] == self.id:  # Verifica si es el jugador local
+                                    self.player_info["ammo"] = player_info["ammo"]  # Actualizar la munición local
+                                    self.player_info["health"] = player_info["health"]  # Actualizar la salud local
+                                    self.player_info["is_alive"] = player_info["is_alive"]  
+                                    self.shoot_cooldown = player_info.get("shoot_cooldown", 0)  # Actualizar el cooldown
+
                         except json.JSONDecodeError as e:
                             print(f"Error al procesar mensaje JSON: {e}")
                 else:
@@ -81,6 +91,7 @@ class Client:
         try:
             # Serializar y enviar datos del jugador
             json_data = json.dumps(self.player_info).encode('utf-8') + b'\n'
+            print(f"Enviando datos del jugador: {json_data}")
             self.client.send(json_data)
         except Exception as e:
             print(f"Error al enviar datos: {e}")
@@ -91,17 +102,16 @@ class Client:
                 pickup_rect = pygame.Rect(pickup["x"], pickup["y"], 32, 32)
                 player_rect = pygame.Rect(self.player_info["x"], self.player_info["y"], 32, 32)
                 if player_rect.colliderect(pickup_rect):
-                    # Enviar datos de la colisión al servidor
-                    collision_data = {
-                        "pickup_collected": pickup["weapon_type"],
-                        "pickup_position": (pickup["x"], pickup["y"])
-                    }
-                    try:
-                        self.client.send(json.dumps(collision_data).encode('utf-8') + b'\n')
-                    except Exception as e:
-                        print(f"Error al enviar datos de colisión: {e}")
-                    pickup["active"] = False
-
+                                    # Enviar datos de la colisión al servidor
+                                    collision_data = {
+                                        "pickup_collected": pickup["weapon_type"],
+                                        "pickup_position": (pickup["x"], pickup["y"])
+                                    }
+                                    try:
+                                        self.client.send(json.dumps(collision_data).encode('utf-8') + b'\n')
+                                    except Exception as e:
+                                        print(f"Error al enviar datos de colisión: {e}")
+                                    pickup["active"] = False
 
 # Función principal del juego
 def Main():
@@ -148,9 +158,7 @@ def Main():
             dy -= Player.speed
         if keys[pygame.K_s]:
             dy += Player.speed
-        if keys[pygame.K_r]:
-            Player.weapon.reload()
-            
+                    
         camera.update(Player)
 
         # Acción con el ratón
@@ -158,8 +166,13 @@ def Main():
         shot_fired = False
         if Mouse[0]:
             angle = Player.lookAtMouse(camera)
-            if Player.weapon.shoot(angle):
-                shot_fired = True
+            current_time = time.time()
+            
+            weapon_cooldown = Player.weapon.shoot_cooldown / 1000.0  # Convertir a segundos
+            if current_time - client.last_shot_time >= weapon_cooldown:
+                if Player.weapon.shoot(angle):
+                    shot_fired = True
+                    client.last_shot_time = current_time
                 
         # Actualizar la información del jugador y verificar daño
         for player_info in client.players:
@@ -169,6 +182,7 @@ def Main():
                                         camera.apply_pos((Player.x, Player.y))[1])
                 Player.current_health = player_info["health"]
                 Player.is_alive = player_info["is_alive"]
+                Player.weapon.current_ammo = player_info["ammo"]  # Actualizar la munición
                 if not Player.is_alive:
                     Player.die()
 
@@ -185,8 +199,6 @@ def Main():
             "is_alive": Player.is_alive
         }
         
-
-                    
         client.send_data()
 
         # Mover y rotar el jugador
@@ -198,7 +210,6 @@ def Main():
         Screen.blit(world.background, camera.apply(world))
         Player.draw(Screen, camera)
         Player.weapon.DrawAmmo(Screen)
-        
         
         # Dibujar la salud del jugador local
         client.health_display.draw_health(
@@ -220,7 +231,7 @@ def Main():
                     remote_player = Scout(player_info["x"], player_info["y"])
 
                 remote_player.is_alive = player_info.get("is_alive", True)
-                if remote_player.is_alive:
+                if remote_player .is_alive:
                     remote_player.angle = player_info["angle"]
                     visual_angle = remote_player.angle - 90
                     remote_player.update_frame()
@@ -272,4 +283,4 @@ def Main():
 
 
 if __name__ == "__main__":
-    Main()
+    Main() 

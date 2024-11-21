@@ -11,6 +11,7 @@ class RocketLauncher(Weapon):
         self.shoot_cooldown = 1000  # Disparo más 
         self.damage = 20
         self.bullet_speed = 9
+        self.bullets = []
 
     def shoot(self, angle):
         current_time = pygame.time.get_ticks()
@@ -20,7 +21,7 @@ class RocketLauncher(Weapon):
             bullet_y = self.shooter.y - radius * math.sin(math.radians(angle))
 
             bullet = Bullet((bullet_x, bullet_y), angle, self.shooter, self.damage, self.bullet_speed)  # Sin dispersión
-            self.bullets.add(bullet)
+            self.bullets.append(bullet)
             self.current_ammo -= 1
             self.last_shot_time = current_time
 

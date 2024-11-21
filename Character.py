@@ -149,3 +149,4 @@ class Character(pygame.sprite.Sprite):
         self.current_health = self.max_health
         self.is_alive = True
         self.rect.center = (self.x, self.y)
+        
