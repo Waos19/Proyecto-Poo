@@ -7,7 +7,7 @@ import math
 import Settings
 
 class Server:
-    def __init__(self, host='localhost', port=5555):
+    def __init__(self, host='26.128.187.2', port=5555):
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.bind((host, port))
         self.clients = []
@@ -48,7 +48,6 @@ class Server:
                 self.last_spawn_time = time.time()
 
     def handle_client(self, client, player_id):
-        # Agregar jugador a la lista
         self.player_data.append({
             "id": player_id,
             "x": 0,
@@ -59,54 +58,70 @@ class Server:
             "ship_type": "Fighter",
             "is_alive": True
         })
-
+        
+        buffer = ""
         while self.running:
             try:
-                data = client.recv(4096)
+                data = client.recv(4096).decode('utf-8')
                 if not data:
                     break
 
-                received_data = json.loads(data.decode('utf-8'))
+                buffer += data
+                
+                while '\n' in buffer:
+                    message, buffer = buffer.split('\n', 1)
+                    try:
+                        received_data = json.loads(message)
+                        
+                        if "pickup_collected" in received_data:
+                            weapon_type = received_data["pickup_collected"]
+                            pickup_position = received_data["pickup_position"]
+                            for pickup in self.pickups:
+                                if pickup["active"] and (pickup["x"], pickup["y"]) == pickup_position:
+                                    pickup["active"] = False
+                                    print(f"Pickup {weapon_type} recogido por el jugador {player_id}")
+                                    break
 
-                # Si se recoge un pickup, desactivarlo
-                if "pickup_collected" in received_data:
-                    weapon_type = received_data["pickup_collected"]
-                    pickup_position = received_data["pickup_position"]
-                    for pickup in self.pickups:
-                        if pickup["active"] and (pickup["x"], pickup["y"]) == pickup_position:
-                            pickup["active"] = False
-                            print(f"Pickup {weapon_type} recogido por el jugador {player_id}")
-                            break
+                        # Actualizar datos del jugador directamente
+                        for i, player in enumerate(self.player_data):
+                            if player["id"] == player_id:
+                                # Actualizar todos los campos del jugador
+                                self.player_data[i] = {
+                                    **player,  # Mantener datos existentes
+                                    "x": received_data.get("x", player["x"]),
+                                    "y": received_data.get("y", player["y"]),
+                                    "angle": received_data.get("angle", player["angle"]),
+                                    "health": received_data.get("health", player["health"]),
+                                    "ammo": received_data.get("ammo", player["ammo"]),
+                                    "ship_type": received_data.get("ship_type", player["ship_type"]),
+                                    "is_alive": received_data.get("is_alive", player["is_alive"])
+                                }
+                                if self.player_data[i]["health"] <= 0:
+                                    self.player_data[i]["is_alive"] = False
+                                    self.player_data[i]["health"] = 0
+                                break
 
-                # Actualizar datos del jugador
-                for player in self.player_data:
-                    if player["id"] == player_id:
-                        player.update(received_data)  # El ángulo se incluye automáticamente aquí
-                        if player["health"] <= 0:
-                            player["is_alive"] = False
-                            player["health"] = 100
-                        break
+                        if "shot_fired" in received_data and received_data["shot_fired"]:
+                            new_bullet = {
+                                "x": received_data["x"],
+                                "y": received_data["y"],
+                                "angle": received_data["angle"],
+                                "shooter_id": player_id,
+                                "creation_time": time.time(),
+                                "speed": 15,
+                                "damage": 25,
+                                "active": True
+                            }
+                            self.bullets.append(new_bullet)
 
-                # Si el jugador disparó, crear una nueva bala
-                if "shot_fired" in received_data and received_data["shot_fired"]:
-                    new_bullet = {
-                        "x": received_data["x"],
-                        "y": received_data["y"],
-                        "angle": received_data["angle"],
-                        "shooter_id": player_id,
-                        "creation_time": time.time(),
-                        "speed": 15,
-                        "damage": 25,
-                        "active": True
-                    }
-                    self.bullets.append(new_bullet)
+                    except json.JSONDecodeError as e:
+                        print(f"Error decodificando JSON: {e}")
+                        continue
 
-                # Actualizar las balas, pickups y verificar colisiones
                 self.update_bullets()
                 self.update_pickups()
                 self.handle_pickup_collision()
 
-                # Generar el estado del juego y enviarlo a los clientes
                 game_state = {
                     "players": self.player_data,
                     "bullets": self.bullets,
@@ -118,7 +133,6 @@ class Server:
                 print(f"Error handling client: {e}")
                 break
 
-        # Eliminar jugador desconectado de la lista
         self.player_data = [p for p in self.player_data if p["id"] != player_id]
         if client in self.clients:
             self.clients.remove(client)
@@ -127,45 +141,48 @@ class Server:
         current_time = time.time()
         updated_bullets = []
 
-        # Actualizar la posición de las balas y verificar colisiones con los jugadores
         for bullet in self.bullets:
-            if current_time - bullet["creation_time"] > 2.0:  # Las balas se eliminan después de 2 segundos
+            if current_time - bullet["creation_time"] > 2.0:
                 continue
 
             bullet["x"] += math.cos(math.radians(bullet["angle"])) * bullet["speed"]
             bullet["y"] -= math.sin(math.radians(bullet["angle"])) * bullet["speed"]
 
             hit_detected = False
-            for player in self.player_data:
+            for i, player in enumerate(self.player_data):
                 if player["id"] != bullet["shooter_id"] and player["is_alive"]:
                     dx = player["x"] - bullet["x"]
                     dy = player["y"] - bullet["y"]
-                    distance = math.sqrt(dx * dx + dy * dy)
+                    distance = math.sqrt(dx ** 2 + dy ** 2)
 
-                    if distance < 40:  # Distancia de impacto
-                        player["health"] = max(0, player["health"] - bullet["damage"])
-                        if player["health"] <= 0:
-                            player["is_alive"] = False
-                        print(f"Impacto en el jugador {player['id']}! Salud: {player['health']}")
+                    if distance < 20:  # Radio de colisión
+                        self.player_data[i]["health"] -= bullet["damage"]
+                        if self.player_data[i]["health"] <= 0:
+                            self.player_data[i]["is_alive"] = False
+                            self.player_data[i]["health"] = 0
+                        print(f"Jugador {player['id']} impactado. Salud: {self.player_data[i]['health']}")
                         hit_detected = True
                         break
 
-            if not hit_detected and bullet["active"]:
+            if not hit_detected:
                 updated_bullets.append(bullet)
 
         self.bullets = updated_bullets
 
     def broadcast(self, data):
+        message = json.dumps(data) + '\n'
         dead_clients = []
+        
         for client in self.clients:
             try:
-                client.send((json.dumps(data) + '\n').encode('utf-8'))
+                client.sendall(message.encode('utf-8'))
             except:
                 dead_clients.append(client)
-
-        # Eliminar clientes desconectados
+                print(f"Error al enviar datos a un cliente")
+        
         for client in dead_clients:
-            self.clients.remove(client)
+            if client in self.clients:
+                self.clients.remove(client)
 
     def handle_pickup_collision(self):
         for player in self.player_data:
@@ -174,9 +191,8 @@ class Server:
                     if pickup["active"]:
                         dx = player["x"] - pickup["x"]
                         dy = player["y"] - pickup["y"]
-                        distance = math.sqrt(dx * dx + dy * dy)
+                        distance = math.sqrt(dx ** 2 + dy ** 2)
 
-                        # Si el jugador está cerca del pickup, recogerlo
                         if distance < 40:
                             player["weapon_type"] = pickup["weapon_type"]
                             pickup["active"] = False

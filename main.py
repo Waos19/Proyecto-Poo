@@ -1,7 +1,7 @@
 import pygame
 import sys
 import socket
-import json  # Se usa JSON para serialización/deserialización
+import json  
 import threading
 import Settings
 from World import World
@@ -26,11 +26,10 @@ Font = pygame.font.Font(None, 36)  # Fuente para el texto
 
 # Clase para manejar la conexión al servidor
 class Client:
-    def __init__(self, host='localhost', port=5555):
+    def __init__(self, host='26.128.187.2', port=5555):
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client.connect((host, port))
         self.buffer = ""  # Buffer para manejar mensajes fragmentados
-        
         # Recibir el ID único del servidor
         data = self.client.recv(4096)
         initial_info = json.loads(data.decode('utf-8'))
@@ -157,6 +156,14 @@ def Main():
             angle = Player.lookAtMouse(camera)
             if Player.weapon.shoot(angle):
                 shot_fired = True
+                
+        # Actualizar la información del jugador y verificar daño
+        for player_info in client.players:
+            if player_info["id"] == client.id:
+                Player.current_health = player_info["health"]  # Actualizar la salud directamente desde el servidor
+                Player.is_alive = player_info["is_alive"]
+                if not Player.is_alive:
+                    Player.die()  # Esto manejará el respawn
 
         # Actualizar la información del jugador
         client.player_info = {
@@ -170,6 +177,9 @@ def Main():
             "shot_fired": shot_fired,
             "is_alive": Player.is_alive
         }
+        
+
+                    
         client.send_data()
 
         # Mover y rotar el jugador
