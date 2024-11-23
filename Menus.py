@@ -200,4 +200,3 @@ def Menu():
         pygame.display.flip()
         Clock.tick(Settings.Fps)
 
-Menu()
