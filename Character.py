@@ -2,125 +2,151 @@ import pygame
 import Settings
 import os
 import math
-from Bullet import Bullet
+from DefaultWeapon import Pistol
 import random
 
-class Character:
-    def __init__(self, x, y):
+class Character(pygame.sprite.Sprite):
+    def __init__(self, x, y, player_id = None):
+        super().__init__()
         self.x = x
         self.y = y
-        image_path = os.path.join('assets', 'Sprites', 'Player','Main Ship - Base - Full health.png')
-        self.original_image = pygame.image.load(image_path).convert_alpha()
-        self.image = pygame.transform.scale(self.original_image, (Settings.tamaño_personaje, Settings.tamaño_personaje))
-        self.rect = self.image.get_rect(center=(x, y))
-        self.radius = self.rect.width // 2  # Radio para colisiones
-        self.collision_rect = pygame.Rect(x - self.radius, y - self.radius, self.radius * 2, self.radius * 2)
-        
+        self.id = player_id
+
+        # Inicializar variables de animación
+        self.frame = 0
+        self.angle = 0  # Ángulo para la rotación
+        self.image = None
+        self.rect = None
+        self.original_image = None
+        self.scaled_image = None # Imagen escalada
+        self.is_alive = True
+        self.respawn_delay = 2000  # 2 segundos en milisegundos
+        self.death_time = 0
+
+        # Cargar la hoja de sprites (sprite sheet)
+        self.sheet = pygame.image.load(os.path.join('assets', 'Sprites', 'Player', 'Nautolan Ship - Scout - Sprite.png')).convert_alpha()
+        self.sheet.set_clip(pygame.Rect(0, 0, 64, 64))  # Tamaño de cada frame: 64x64
+
+        # Estados de animación para cada dirección
+        self.left_states = {0: (0, 0, 64, 64), 1: (64, 0, 64, 64), 2: (128, 0, 64, 64), 3: (192, 0, 64, 64)}
+        self.right_states = {0: (0, 0, 64, 64), 1: (64, 0, 64, 64), 2: (128, 0, 64, 64), 3: (192, 0, 64, 64)}
+        self.up_states = {0: (0, 0, 64, 64), 1: (64, 0, 64, 64), 2: (128, 0, 64, 64), 3: (192, 0, 64, 64)}
+        self.down_states = {0: (0, 0, 64, 64), 1: (64, 0, 64, 64), 2: (128, 0, 64, 64), 3: (192, 0, 64, 64)}
+
+        self.direction_states = self.down_states  # Estado inicial de animación
+
+        # Inicializar el arma
+        self.weapon = Pistol(self)
+
+        # Salud
         self.max_health = 100
         self.current_health = self.max_health
         self.health_bar_length = 100
         self.health_ratio = self.max_health / self.health_bar_length
 
-        self.bullets = pygame.sprite.Group()
-        
-        self.max_ammo = 30
-        self.current_ammo = self.max_ammo
-        self.reload_time = 2000
-        self.last_reload_time = 0
-        self.reloading = False
-        
-        self.shoot_cooldown = 100
-        self.last_shot_time = 0
-        
-        self.font = pygame.font.Font(None, 36)
-        
-    def take_damage(self, amount):
-        self.current_health -= amount
-        if self.current_health <= 0:
-            self.current_health = 0
-            print("Game Over")
-            
-    def draw_health(self, screen):
-        pygame.draw.rect(screen, (255,0,0), (10, 40, self.health_bar_length, 20))
-        pygame.draw.rect(screen, (0,255,0), (10, 40, self.current_health / self.health_ratio, 20))
-    
-    def Shoot(self, angle):
-        current_time = pygame.time.get_ticks()
+        # Establecer sprite inicial
+        self.set_sprite(os.path.join('assets', 'Sprites', 'Player', 'Nautolan Ship - Scout - Sprite.png'))
 
-        if not self.reloading and self.current_ammo > 0 and (current_time - self.last_shot_time) > self.shoot_cooldown:
-            radius = self.rect.width / 2
-            bullet_x = self.x + radius * math.cos(math.radians(angle))
-            bullet_y = self.y - radius * math.sin(math.radians(angle))
+    def set_sprite(self, image_path):
+        """ Método para cambiar el sprite del personaje """
+        self.sheet = pygame.image.load(image_path).convert_alpha()  # Cargar el nuevo sprite
+        self.sheet.set_clip(pygame.Rect(0, 0, 64, 64))  # Tamaño de cada frame
 
-            dispersion = random.uniform(-7, 7)
-            angle_with_dispersion = angle + dispersion
+        # Escalar la imagen según el valor global de escala
+        self.original_image = self.sheet.subsurface(self.sheet.get_clip())
+        self.scaled_image = pygame.transform.scale(self.original_image, (Settings.Player_scale, Settings.Player_scale))
 
-            bullet = Bullet((bullet_x, bullet_y), angle_with_dispersion, self)  # Pasamos self como el shooter
-            self.bullets.add(bullet)
-            self.current_ammo -= 1
-            self.last_shot_time = current_time
+        # Establecer la imagen escalada
+        self.image = self.scaled_image
+        self.rect = self.image.get_rect(center=(self.x, self.y))  # Actualizar el rectángulo
 
-            if self.current_ammo == 0:
-                self.Reload()
-                
-    def Reload(self):
-        if not self.reloading and self.current_ammo < self.max_ammo:
-            self.reloading = True
-            self.last_reload_time = pygame.time.get_ticks()
+    def update_frame(self):
+        # Actualizar el frame de animación
+        self.frame = (self.frame + 1) % len(self.direction_states)
+        self.sheet.set_clip(pygame.Rect(self.direction_states[self.frame]))
 
-    def Update(self):
-        if self.reloading:
-            current_time = pygame.time.get_ticks()
-            if current_time - self.last_reload_time >= self.reload_time:
-                self.current_ammo = self.max_ammo
-                self.reloading = False
-        
-        self.bullets.update()
+        # Obtener la imagen base sin rotar
+        self.original_image = self.sheet.subsurface(self.sheet.get_clip())
 
-    def Draw(self, screen, camera):
-        screen.blit(self.image, camera.apply(self))
-        for bullet in self.bullets:
-            bullet.draw(screen, camera)
-        self.draw_health(screen)
-    
-    def DrawAmmo(self, screen):
-         ammo_text = self.font.render(f'Munición: {self.current_ammo}/{self.max_ammo}', True, (255, 255, 255))
-         screen.blit(ammo_text, (10, 10))  
+        # Aplicar la escala solo una vez
+        self.scaled_image = pygame.transform.scale(self.original_image, (Settings.Player_scale, Settings.Player_scale))
 
-         if self.reloading:
-            current_time = pygame.time.get_ticks()
-            reload_progress = (current_time - self.last_reload_time) / self.reload_time
-            reload_bar_length = 200  
-            bar_color = (0, 255, 0)  
+        # Aplicar la rotación sobre la imagen escalada
+        self.image = pygame.transform.rotate(self.scaled_image, self.angle - 90)
+        self.rect = self.image.get_rect(center=(self.x, self.y))
 
-            pygame.draw.rect(screen, bar_color, (10, 50, reload_bar_length * reload_progress, 20))
-    
-    def Movement(self, dx, dy):
+    def update(self):
+        self.update_frame()
+        self.weapon.update()  # Actualizar el arma también
+
+    def draw(self, screen, camera):
+        screen.blit(self.image, camera.apply(self))  # Asumiendo que camera.apply() ajusta la posición
+
+    def movement(self, dx, dy):
         if dx != 0 and dy != 0:
-            dx *= 0.7071  
+            dx *= 0.7071
             dy *= 0.7071
-        
         self.x += dx
         self.y += dy
         self.x = max(self.rect.width // 2, min(self.x, Settings.world_width - self.rect.width // 2))
-        self.y = max(self.rect.height // 2, min(self.y, Settings.world_heigh - self.rect.height // 2))
+        self.y = max(self.rect.height // 2, min(self.y, Settings.world_height - self.rect.height // 2))
         self.rect.center = (self.x, self.y)
-        self.collision_rect.center = (self.x, self.y)
 
-    def LookAtMouse(self, camera):
+        # Actualizar la dirección de animación según el movimiento
+        if dx > 0:
+            self.direction_states = self.right_states
+        elif dx < 0:
+            self.direction_states = self.left_states
+        elif dy < 0:
+            self.direction_states = self.up_states
+        elif dy > 0:
+            self.direction_states = self.down_states
+
+    def lookAtMouse(self, camera):
         mouse_x, mouse_y = pygame.mouse.get_pos()
+
+        # Calcular la posición mundial del mouse con el desplazamiento de la cámara
         mouse_x_world = mouse_x - camera.camera_rect.x
         mouse_y_world = mouse_y - camera.camera_rect.y
 
-        dx = mouse_x_world - self.x
-        dy = mouse_y_world - self.y
-        angle = math.degrees(math.atan2(-dy, dx))  
+        # Calcular el vector de dirección del personaje al mouse
+        dx = mouse_x_world - self.rect.centerx
+        dy = mouse_y_world - self.rect.centery
 
-        visual_angle = angle - 90  
+        # Calcular el ángulo en radianes y convertirlo a grados
+        self.angle = math.degrees(math.atan2(-dy, dx))
 
-        scaled_image = pygame.transform.scale(self.original_image, (Settings.tamaño_personaje, Settings.tamaño_personaje))
-        self.image = pygame.transform.rotate(scaled_image, visual_angle)
-        self.rect = self.image.get_rect(center=(self.x, self.y))
-        self.collision_rect.center = (self.x, self.y)
+        # Actualizar el ángulo de rotación
+        self.image = pygame.transform.rotate(self.scaled_image, self.angle - 90)
 
-        return angle  
+        # Mantener la posición del centro al rotar
+        old_center = self.rect.center
+        self.rect = self.image.get_rect()
+        self.rect.center = old_center
+
+        return self.angle
+    
+    def get_gun_position(self):
+        offset_distance = 32
+        gun_x = self.rect.centerx + math.cos(math.radians(self.angle)) * offset_distance
+        gun_y = self.rect.centery - math.sin(math.radians(self.angle)) * offset_distance
+        return gun_x, gun_y
+
+    def take_damage(self, damage):
+        self.current_health = max(0, self.current_health - damage)
+        if self.current_health <= 0 and self.is_alive:
+            self.die()
+    
+    def die(self):
+        self.is_alive = False
+        self.death_time = pygame.time.get_ticks()
+        self.respawn()
+        
+    def respawn(self):
+        # Generar posición aleatoria dentro del mundo
+        self.x = random.randint(100, Settings.world_width - 100)
+        self.y = random.randint(100, Settings.world_height - 100)
+        self.current_health = self.max_health
+        self.is_alive = True
+        self.rect.center = (self.x, self.y)
+        
